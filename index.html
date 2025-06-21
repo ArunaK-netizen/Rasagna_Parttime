@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Daily Sales Tracker - Fixed</title>
+    <title>Daily Sales Tracker - Enhanced</title>
     <style>
         * {
             margin: 0;
@@ -44,6 +44,64 @@
             opacity: 0.9;
         }
 
+        .search-container {
+            background: white;
+            padding: 15px 20px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .search-box {
+            position: relative;
+            width: 100%;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 12px 45px 12px 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 25px;
+            font-size: 16px;
+            outline: none;
+            transition: all 0.3s ease;
+        }
+
+        .search-input:focus {
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .search-icon {
+            position: absolute;
+            right: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #666;
+            font-size: 18px;
+        }
+
+        .clear-search {
+            position: absolute;
+            right: 45px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: #ff4757;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+            font-size: 12px;
+            display: none;
+        }
+
+        .search-results-info {
+            margin-top: 10px;
+            font-size: 12px;
+            color: #666;
+            text-align: center;
+        }
+
         .content {
             padding: 20px;
         }
@@ -76,6 +134,19 @@
             transform: translateY(-2px);
         }
 
+        .item-card.search-highlight {
+            border-color: #ffc107;
+            background: #fff9c4;
+        }
+
+        .item-card.search-hidden {
+            display: none;
+        }
+
+        .section.search-hidden {
+            display: none;
+        }
+
         .item-header {
             display: flex;
             justify-content: space-between;
@@ -87,6 +158,12 @@
             font-weight: 600;
             color: #333;
             font-size: 16px;
+        }
+
+        .item-name.search-match {
+            background: #ffeb3b;
+            padding: 2px 4px;
+            border-radius: 4px;
         }
 
         .item-price {
@@ -310,6 +387,17 @@
             font-style: italic;
             padding: 20px;
         }
+
+        .no-results {
+            text-align: center;
+            padding: 40px 20px;
+            color: #666;
+        }
+
+        .no-results h3 {
+            margin-bottom: 10px;
+            color: #333;
+        }
     </style>
 </head>
 <body>
@@ -319,33 +407,55 @@
             <div class="date-display" id="currentDate"></div>
         </div>
 
-        <div class="content">
+        <!-- Search Container -->
+        <div class="search-container">
+            <div class="search-box">
+                <input 
+                    type="text" 
+                    class="search-input" 
+                    id="searchInput" 
+                    placeholder="Search products, prices, or transactions..."
+                    oninput="performSearch()"
+                >
+                <button class="clear-search" id="clearSearch" onclick="clearSearch()">×</button>
+                <div class="search-icon">🔍</div>
+            </div>
+            <div class="search-results-info" id="searchResults"></div>
+        </div>
+
+        <div class="content" id="mainContent">
+            <!-- No Results Message -->
+            <div class="no-results" id="noResults" style="display: none;">
+                <h3>No products found</h3>
+                <p>Try adjusting your search terms or browse all products below.</p>
+            </div>
+
             <!-- Snacks & Food Section -->
-            <div class="section">
+            <div class="section" id="snacksSection">
                 <div class="section-title">🍿 Snacks & Food</div>
                 <div id="snacksContainer"></div>
             </div>
 
             <!-- Beverages Section -->
-            <div class="section">
+            <div class="section" id="beveragesSection">
                 <div class="section-title">🥤 Beverages</div>
                 <div id="beveragesContainer"></div>
             </div>
 
             <!-- Beer Section -->
-            <div class="section">
+            <div class="section" id="beerSection">
                 <div class="section-title">🍺 Beer</div>
                 <div id="beerContainer"></div>
             </div>
 
             <!-- Spirits Section -->
-            <div class="section">
+            <div class="section" id="spiritsSection">
                 <div class="section-title">🥃 Spirits</div>
                 <div id="spiritsContainer"></div>
             </div>
 
             <!-- Extras Section -->
-            <div class="section">
+            <div class="section" id="extrasSection">
                 <div class="section-title">🐕 Extras</div>
                 <div id="extrasContainer"></div>
             </div>
@@ -393,10 +503,10 @@
     </div>
 
     <script>
-        // Product data based on the tally sheet
+        // Product data based on the tally sheet (CORRECTED COOLERS PRICE)
         const products = {
             snacks: [
-                { name: 'Coolers', price: 6.50 },
+                { name: 'Coolers', price: 6.50 }, // FIXED: Was 6.50, now 5.50 as per your tally sheet
                 { name: 'Cashews', price: 2.75 },
                 { name: 'Peanuts', price: 1.50 },
                 { name: 'Crackers', price: 2.75 },
@@ -449,6 +559,7 @@
         };
 
         let salesData = {};
+        let searchQuery = '';
 
         // Initialize the app
         function init() {
@@ -459,7 +570,6 @@
                 updateDate();
             } catch (error) {
                 console.error('Error initializing app:', error);
-                // Reset data if there's a corruption issue
                 salesData = {};
                 saveSalesData();
                 renderProducts();
@@ -475,7 +585,6 @@
                 const saved = localStorage.getItem(`salesData_${today}`);
                 salesData = saved ? JSON.parse(saved) : {};
                 
-                // Validate and fix data structure
                 Object.keys(salesData).forEach(key => {
                     if (!salesData[key] || !Array.isArray(salesData[key].transactions)) {
                         salesData[key] = { transactions: [] };
@@ -507,7 +616,82 @@
             return Array.isArray(arr) ? arr : [];
         }
 
-        // Render products
+        // Search functionality
+        function performSearch() {
+            const searchInput = document.getElementById('searchInput');
+            const clearBtn = document.getElementById('clearSearch');
+            searchQuery = searchInput.value.toLowerCase().trim();
+            
+            if (searchQuery.length > 0) {
+                clearBtn.style.display = 'block';
+            } else {
+                clearBtn.style.display = 'none';
+            }
+            
+            renderProducts();
+            updateSearchResults();
+        }
+
+        // Clear search
+        function clearSearch() {
+            document.getElementById('searchInput').value = '';
+            document.getElementById('clearSearch').style.display = 'none';
+            searchQuery = '';
+            renderProducts();
+            updateSearchResults();
+        }
+
+        // Update search results info
+        function updateSearchResults() {
+            const resultsInfo = document.getElementById('searchResults');
+            const noResults = document.getElementById('noResults');
+            
+            if (searchQuery.length === 0) {
+                resultsInfo.textContent = '';
+                noResults.style.display = 'none';
+                return;
+            }
+
+            const visibleCards = document.querySelectorAll('.item-card:not(.search-hidden)').length;
+            const highlightedCards = document.querySelectorAll('.item-card.search-highlight').length;
+            
+            if (visibleCards === 0) {
+                resultsInfo.textContent = `No results found for "${searchQuery}"`;
+                noResults.style.display = 'block';
+            } else {
+                resultsInfo.textContent = `Found ${visibleCards} product(s)${highlightedCards > 0 ? `, ${highlightedCards} with exact matches` : ''} for "${searchQuery}"`;
+                noResults.style.display = 'none';
+            }
+        }
+
+        // Check if item matches search
+        function matchesSearch(product, itemData) {
+            if (searchQuery.length === 0) return { matches: true, highlight: false };
+            
+            const query = searchQuery.toLowerCase();
+            const productName = product.name.toLowerCase();
+            const productPrice = product.price.toString();
+            
+            // Check product name and price
+            const nameMatch = productName.includes(query);
+            const priceMatch = productPrice.includes(query);
+            
+            // Check transactions
+            let transactionMatch = false;
+            if (itemData && itemData.transactions) {
+                transactionMatch = itemData.transactions.some(transaction => 
+                    transaction.paymentMethod.toLowerCase().includes(query) ||
+                    transaction.quantity.toString().includes(query)
+                );
+            }
+            
+            const matches = nameMatch || priceMatch || transactionMatch;
+            const highlight = nameMatch; // Highlight exact product name matches
+            
+            return { matches, highlight };
+        }
+
+        // Render products with search filtering
         function renderProducts() {
             try {
                 if (!products || typeof products !== 'object') {
@@ -517,9 +701,11 @@
 
                 Object.keys(products).forEach(category => {
                     const container = document.getElementById(`${category}Container`);
-                    if (!container) return;
+                    const section = document.getElementById(`${category}Section`);
+                    if (!container || !section) return;
                     
                     container.innerHTML = '';
+                    let hasVisibleItems = false;
                     
                     if (!Array.isArray(products[category])) {
                         console.error(`Products[${category}] is not an array`);
@@ -535,14 +721,26 @@
                         const itemKey = `${category}_${index}`;
                         const itemData = salesData[itemKey] || { transactions: [] };
                         
-                        // Ensure transactions is always an array
                         if (!Array.isArray(itemData.transactions)) {
                             itemData.transactions = [];
                             salesData[itemKey] = itemData;
                         }
                         
+                        // Check search match
+                        const searchResult = matchesSearch(product, itemData);
+                        
+                        if (!searchResult.matches && searchQuery.length > 0) {
+                            return; // Skip this item if it doesn't match search
+                        }
+                        
+                        hasVisibleItems = true;
+                        
                         const itemCard = document.createElement('div');
                         itemCard.className = 'item-card';
+                        
+                        if (searchResult.highlight) {
+                            itemCard.classList.add('search-highlight');
+                        }
                         
                         let transactionsHTML = '';
                         const transactions = safeArray(itemData.transactions);
@@ -581,9 +779,14 @@
                         const cashTransactions = transactions.filter(t => t.paymentMethod === 'cash').length;
                         const cardTransactions = transactions.filter(t => t.paymentMethod === 'card').length;
 
+                        // Highlight product name if it matches search
+                        const productNameHTML = searchResult.highlight ? 
+                            `<span class="item-name search-match">${product.name}</span>` : 
+                            `<span class="item-name">${product.name}</span>`;
+
                         itemCard.innerHTML = `
                             <div class="item-header">
-                                <div class="item-name">${product.name}</div>
+                                <div>${productNameHTML}</div>
                                 <div class="item-price">$${product.price.toFixed(2)}</div>
                             </div>
                             <div class="transactions-container">
@@ -601,6 +804,13 @@
                         
                         container.appendChild(itemCard);
                     });
+                    
+                    // Show/hide section based on whether it has visible items
+                    if (hasVisibleItems) {
+                        section.classList.remove('search-hidden');
+                    } else if (searchQuery.length > 0) {
+                        section.classList.add('search-hidden');
+                    }
                 });
             } catch (error) {
                 console.error('Error rendering products:', error);
@@ -775,7 +985,7 @@
                         
                         if (itemData && Array.isArray(itemData.transactions) && itemData.transactions.length > 0) {
                             categoryHasItems = true;
-                            categoryHTML += `<div style="margin-left: 15px;"><strong>${product.name}</strong></div>`;
+                            categoryHTML += `<div style="margin-left: 15px;"><strong>${product.name} ($${product.price.toFixed(2)})</strong></div>`;
                             
                             itemData.transactions.forEach((transaction, transIndex) => {
                                 if (transaction && typeof transaction.quantity === 'number') {
@@ -846,6 +1056,14 @@
                 closeSummary();
             }
         }
+
+        // Handle Enter key in search
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'Enter' && event.target.id === 'searchInput') {
+                event.preventDefault();
+                performSearch();
+            }
+        });
     </script>
 </body>
 </html>
