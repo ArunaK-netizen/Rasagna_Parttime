@@ -398,6 +398,106 @@
             margin-bottom: 10px;
             color: #333;
         }
+        .summary-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 1000;
+            backdrop-filter: blur(8px);
+        }
+
+        .modal-content {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: #2a2a3a;
+            color: #f5f5f5;
+            padding: 30px;
+            border-radius: 20px;
+            max-width: 90%;
+            max-height: 80%;
+            overflow-y: auto;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            width: 480px;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        .modal-content h2 {
+            color: #667eea;
+            text-align: center;
+            margin-bottom: 20px;
+            font-size: 22px;
+        }
+
+        .modal-content h3 {
+            color: #ff8e8e;
+            margin: 15px 0 10px 0;
+            font-size: 18px;
+        }
+
+        .modal-content hr {
+            border: none;
+            height: 1px;
+            background: rgba(255, 255, 255, 0.1);
+            margin: 20px 0;
+        }
+
+        .summary-transaction {
+            background: #3a3a4a;
+            border-radius: 10px;
+            padding: 10px 15px;
+            margin: 8px 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 14px;
+        }
+
+        .summary-transaction span {
+            color: #f5f5f5;
+        }
+
+        .summary-total {
+            background: #4a4a5a;
+            border-radius: 10px;
+            padding: 12px 15px;
+            margin: 12px 0;
+            font-weight: bold;
+            display: block;
+            text-align: center;
+        }
+
+        .close-btn {
+            position: absolute;
+            top: 10px;
+            right: 15px;
+            background: none;
+            border: none;
+            color: #f5f5f5;
+            font-size: 24px;
+            cursor: pointer;
+            opacity: 0.7;
+            transition: opacity 0.2s;
+        }
+
+        .close-btn:hover {
+            opacity: 1;
+        }
+
+        .summary-item {
+            background: #3a3a4a;
+            border-radius: 8px;
+            padding: 8px 12px;
+            margin: 8px 0 0 0;
+            font-size: 13px;
+            color: #f5f5f5;
+        }
+
     </style>
 </head>
 <body>
@@ -964,71 +1064,79 @@
         }
 
         // Show summary
-        function showSummary() {
-            try {
-                const modal = document.getElementById('summaryModal');
-                const content = document.getElementById('summaryContent');
+function showSummary() {
+    try {
+        const modal = document.getElementById('summaryModal');
+        const content = document.getElementById('summaryContent');
+        
+        let cashTotal = 0;
+        let cardTotal = 0;
+        let totalTransactions = 0;
+        let summaryHTML = '<h2>Day Summary</h2>';
+        
+        Object.keys(products).forEach(category => {
+            let categoryHasItems = false;
+            let categoryHTML = '';
+            
+            products[category].forEach((product, index) => {
+                const itemKey = `${category}_${index}`;
+                const itemData = salesData[itemKey];
                 
-                let summaryHTML = '<h2>Day Summary</h2>';
-                let cashTotal = 0;
-                let cardTotal = 0;
-                let totalTransactions = 0;
-                
-                Object.keys(products).forEach(category => {
-                    let categoryHTML = `<h3>${category.charAt(0).toUpperCase() + category.slice(1)}</h3>`;
-                    let categoryHasItems = false;
+                if (itemData && Array.isArray(itemData.transactions) && itemData.transactions.length > 0) {
+                    categoryHasItems = true;
+                    categoryHTML += `
+                        <div class="summary-item">
+                            <strong>${product.name} ($${product.price.toFixed(2)})</strong>
+                        </div>
+                    `;
                     
-                    products[category].forEach((product, index) => {
-                        const itemKey = `${category}_${index}`;
-                        const itemData = salesData[itemKey];
-                        
-                        if (itemData && Array.isArray(itemData.transactions) && itemData.transactions.length > 0) {
-                            categoryHasItems = true;
-                            categoryHTML += `<div style="margin-left: 15px;"><strong>${product.name} ($${product.price.toFixed(2)})</strong></div>`;
+                    itemData.transactions.forEach((transaction, transIndex) => {
+                        if (transaction && typeof transaction.quantity === 'number') {
+                            const quantity = parseInt(transaction.quantity) || 0;
+                            const transactionTotal = quantity * product.price;
+                            const paymentMethod = (transaction.paymentMethod || 'cash').toUpperCase();
+                            const transactionColor = paymentMethod === 'CASH' ? '#ff8e8e' : '#667eea';
                             
-                            itemData.transactions.forEach((transaction, transIndex) => {
-                                if (transaction && typeof transaction.quantity === 'number') {
-                                    const quantity = parseInt(transaction.quantity) || 0;
-                                    const transactionTotal = quantity * product.price;
-                                    categoryHTML += `
-                                        <div style="margin-left: 25px; display: flex; justify-content: space-between; margin: 5px 0;">
-                                            <span>Transaction ${transIndex + 1}: ${quantity} item(s)</span>
-                                            <span>$${transactionTotal.toFixed(2)} (${(transaction.paymentMethod || 'cash').toUpperCase()})</span>
-                                        </div>
-                                    `;
-                                    
-                                    if (transaction.paymentMethod === 'cash') {
-                                        cashTotal += transactionTotal;
-                                    } else {
-                                        cardTotal += transactionTotal;
-                                    }
-                                    totalTransactions++;
-                                }
-                            });
+                            categoryHTML += `
+                                <div class="summary-transaction">
+                                    <span>${quantity} item(s)</span>
+                                    <span style="color: ${transactionColor};">$${transactionTotal.toFixed(2)} (${paymentMethod})</span>
+                                </div>
+                            `;
+                            
+                            if (paymentMethod === 'CASH') {
+                                cashTotal += transactionTotal;
+                            } else {
+                                cardTotal += transactionTotal;
+                            }
+                            totalTransactions++;
                         }
                     });
-                    
-                    if (categoryHasItems) {
-                        summaryHTML += categoryHTML;
-                    }
-                });
-                
-                summaryHTML += `
-                    <hr style="margin: 20px 0;">
-                    <div style="font-weight: bold;">
-                        <div>Total Transactions: ${totalTransactions}</div>
-                        <div>Cash Total: $${cashTotal.toFixed(2)}</div>
-                        <div>Card Total: $${cardTotal.toFixed(2)}</div>
-                        <div>Grand Total: $${(cashTotal + cardTotal).toFixed(2)}</div>
-                    </div>
-                `;
-                
-                content.innerHTML = summaryHTML;
-                modal.style.display = 'block';
-            } catch (error) {
-                console.error('Error showing summary:', error);
+                }
+            });
+            
+            if (categoryHasItems) {
+                summaryHTML += `<h3>${category.charAt(0).toUpperCase() + category.slice(1)}</h3>`;
+                summaryHTML += categoryHTML;
             }
-        }
+        });
+        
+        summaryHTML += `
+            <hr>
+            <div class="summary-total">
+                <div>Total Transactions: ${totalTransactions}</div>
+                <div>Cash Total: $${cashTotal.toFixed(2)}</div>
+                <div>Card Total: $${cardTotal.toFixed(2)}</div>
+                <div>Grand Total: $${(cashTotal + cardTotal).toFixed(2)}</div>
+            </div>
+        `;
+        
+        content.innerHTML = summaryHTML;
+        modal.style.display = 'block';
+    } catch (error) {
+        console.error('Error showing summary:', error);
+    }
+}
 
         // Close summary
         function closeSummary() {
