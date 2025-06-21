@@ -1,0 +1,851 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Daily Sales Tracker - Fixed</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 10px;
+        }
+
+        .container {
+            max-width: 480px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(45deg, #ff6b6b, #ff8e8e);
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 24px;
+            margin-bottom: 10px;
+        }
+
+        .date-display {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        .content {
+            padding: 20px;
+        }
+
+        .section {
+            margin-bottom: 25px;
+        }
+
+        .section-title {
+            background: #f8f9fa;
+            padding: 12px 15px;
+            margin: -5px -5px 15px -5px;
+            border-radius: 10px;
+            font-weight: 600;
+            color: #333;
+            border-left: 4px solid #667eea;
+        }
+
+        .item-card {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 15px;
+            margin-bottom: 15px;
+            border: 2px solid transparent;
+            transition: all 0.3s ease;
+        }
+
+        .item-card:hover {
+            border-color: #667eea;
+            transform: translateY(-2px);
+        }
+
+        .item-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .item-name {
+            font-weight: 600;
+            color: #333;
+            font-size: 16px;
+        }
+
+        .item-price {
+            font-weight: 600;
+            color: #667eea;
+            font-size: 16px;
+        }
+
+        .transactions-container {
+            margin-bottom: 15px;
+        }
+
+        .transaction-row {
+            display: grid;
+            grid-template-columns: 50px 1fr 80px 20px;
+            gap: 10px;
+            align-items: center;
+            padding: 8px;
+            background: white;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            border: 1px solid #e0e0e0;
+        }
+
+        .transaction-qty {
+            width: 45px;
+            padding: 6px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            text-align: center;
+            font-weight: 500;
+        }
+
+        .transaction-qty:focus {
+            border-color: #667eea;
+            outline: none;
+        }
+
+        .payment-toggle {
+            display: flex;
+            border-radius: 6px;
+            overflow: hidden;
+            border: 1px solid #ddd;
+        }
+
+        .payment-option {
+            flex: 1;
+            padding: 6px 8px;
+            background: white;
+            border: none;
+            cursor: pointer;
+            font-size: 11px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+
+        .payment-option.active {
+            background: #667eea;
+            color: white;
+        }
+
+        .payment-option:first-child {
+            border-right: 1px solid #ddd;
+        }
+
+        .transaction-total {
+            font-weight: 600;
+            color: #333;
+            text-align: right;
+            font-size: 12px;
+        }
+
+        .delete-transaction {
+            background: #ff4757;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .add-transaction {
+            background: #2ecc71;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 500;
+            font-size: 12px;
+            width: 100%;
+        }
+
+        .add-transaction:hover {
+            background: #27ae60;
+        }
+
+        .item-summary {
+            display: flex;
+            justify-content: space-between;
+            padding-top: 10px;
+            border-top: 1px solid #e0e0e0;
+            font-size: 12px;
+            color: #666;
+        }
+
+        .totals-section {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            padding: 20px;
+            border-radius: 15px;
+            margin: 20px -5px;
+        }
+
+        .total-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+
+        .total-item {
+            text-align: center;
+        }
+
+        .total-label {
+            font-size: 12px;
+            opacity: 0.8;
+            margin-bottom: 5px;
+        }
+
+        .total-value {
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .grand-total {
+            text-align: center;
+            padding-top: 15px;
+            border-top: 1px solid rgba(255,255,255,0.2);
+        }
+
+        .grand-total .total-value {
+            font-size: 28px;
+        }
+
+        .action-buttons {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .btn {
+            padding: 15px;
+            border: none;
+            border-radius: 10px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 16px;
+        }
+
+        .btn-primary {
+            background: #28a745;
+            color: white;
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+
+        .summary-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+        }
+
+        .modal-content {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: 20px;
+            border-radius: 15px;
+            max-width: 90%;
+            max-height: 80%;
+            overflow-y: auto;
+        }
+
+        .close-btn {
+            position: absolute;
+            top: 10px;
+            right: 15px;
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+        }
+
+        .empty-state {
+            text-align: center;
+            color: #666;
+            font-style: italic;
+            padding: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Daily Sales Tracker</h1>
+            <div class="date-display" id="currentDate"></div>
+        </div>
+
+        <div class="content">
+            <!-- Snacks & Food Section -->
+            <div class="section">
+                <div class="section-title">🍿 Snacks & Food</div>
+                <div id="snacksContainer"></div>
+            </div>
+
+            <!-- Beverages Section -->
+            <div class="section">
+                <div class="section-title">🥤 Beverages</div>
+                <div id="beveragesContainer"></div>
+            </div>
+
+            <!-- Beer Section -->
+            <div class="section">
+                <div class="section-title">🍺 Beer</div>
+                <div id="beerContainer"></div>
+            </div>
+
+            <!-- Spirits Section -->
+            <div class="section">
+                <div class="section-title">🥃 Spirits</div>
+                <div id="spiritsContainer"></div>
+            </div>
+
+            <!-- Extras Section -->
+            <div class="section">
+                <div class="section-title">🐕 Extras</div>
+                <div id="extrasContainer"></div>
+            </div>
+
+            <!-- Totals Section -->
+            <div class="totals-section">
+                <div class="total-grid">
+                    <div class="total-item">
+                        <div class="total-label">Cash Sales</div>
+                        <div class="total-value" id="cashTotal">$0.00</div>
+                    </div>
+                    <div class="total-item">
+                        <div class="total-label">Card Sales</div>
+                        <div class="total-value" id="cardTotal">$0.00</div>
+                    </div>
+                    <div class="total-item">
+                        <div class="total-label">Total Items</div>
+                        <div class="total-value" id="itemCount">0</div>
+                    </div>
+                    <div class="total-item">
+                        <div class="total-label">Transactions</div>
+                        <div class="total-value" id="transactionCount">0</div>
+                    </div>
+                </div>
+                <div class="grand-total">
+                    <div class="total-label">Grand Total</div>
+                    <div class="total-value" id="grandTotal">$0.00</div>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="action-buttons">
+                <button class="btn btn-primary" onclick="showSummary()">Day Summary</button>
+                <button class="btn btn-secondary" onclick="resetDay()">Reset Day</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Summary Modal -->
+    <div class="summary-modal" id="summaryModal">
+        <div class="modal-content">
+            <button class="close-btn" onclick="closeSummary()">&times;</button>
+            <div id="summaryContent"></div>
+        </div>
+    </div>
+
+    <script>
+        // Product data based on the tally sheet
+        const products = {
+            snacks: [
+                { name: 'Coolers', price: 6.50 },
+                { name: 'Cashews', price: 2.75 },
+                { name: 'Peanuts', price: 1.50 },
+                { name: 'Crackers', price: 2.75 },
+                { name: 'Candy', price: 2.50 },
+                { name: 'Trail Mix', price: 3.00 },
+                { name: 'Granola Bar', price: 2.50 },
+                { name: 'Protein Bar', price: 3.25 },
+                { name: 'Chips', price: 3.25 }
+            ],
+            beverages: [
+                { name: 'Juice', price: 4.25 },
+                { name: 'Soda', price: 3.50 },
+                { name: 'Water', price: 3.50 },
+                { name: 'Gatorade', price: 4.25 },
+                { name: 'Energy Drink', price: 3.50 }
+            ],
+            beer: [
+                { name: 'Budweiser', price: 5.75 },
+                { name: 'Bud Light', price: 5.75 },
+                { name: 'Coors Light', price: 5.75 },
+                { name: 'Miller Lite', price: 5.75 },
+                { name: 'Yuengling', price: 5.75 },
+                { name: 'Mich Ultra', price: 5.75 },
+                { name: 'Heineken', price: 6.50 },
+                { name: 'Whiteclaw/Truly', price: 5.75 },
+                { name: 'Arnold Palmer', price: 5.75 },
+                { name: 'Stella', price: 6.50 },
+                { name: 'Corona', price: 6.50 },
+                { name: 'Guinness', price: 6.50 },
+                { name: 'Flying Dog', price: 6.50 },
+                { name: 'Mully', price: 6.50 },
+                { name: 'Terrapin', price: 6.50 },
+                { name: 'Summer Shandy', price: 6.50 },
+                { name: 'Domestic 6-pack', price: 24.00 },
+                { name: 'Imported 6-pack', price: 30.00 }
+            ],
+            spirits: [
+                { name: 'Cutwater/Highnoon', price: 8.00 },
+                { name: 'Orange Smash/Nutrl', price: 8.00 },
+                { name: 'Jack Daniels', price: 8.50 },
+                { name: 'Fireball Mini', price: 8.50 },
+                { name: 'Jameson', price: 8.50 },
+                { name: 'Bailey\'s', price: 8.50 },
+                { name: 'Liquor and Mixer', price: 8.50 }
+            ],
+            extras: [
+                { name: 'Dog', price: 7.50 },
+                { name: 'Fish', price: 7.50 }
+            ]
+        };
+
+        let salesData = {};
+
+        // Initialize the app
+        function init() {
+            try {
+                loadSalesData();
+                renderProducts();
+                updateTotals();
+                updateDate();
+            } catch (error) {
+                console.error('Error initializing app:', error);
+                // Reset data if there's a corruption issue
+                salesData = {};
+                saveSalesData();
+                renderProducts();
+                updateTotals();
+                updateDate();
+            }
+        }
+
+        // Load sales data from localStorage
+        function loadSalesData() {
+            try {
+                const today = new Date().toDateString();
+                const saved = localStorage.getItem(`salesData_${today}`);
+                salesData = saved ? JSON.parse(saved) : {};
+                
+                // Validate and fix data structure
+                Object.keys(salesData).forEach(key => {
+                    if (!salesData[key] || !Array.isArray(salesData[key].transactions)) {
+                        salesData[key] = { transactions: [] };
+                    }
+                });
+            } catch (error) {
+                console.error('Error loading sales data:', error);
+                salesData = {};
+            }
+        }
+
+        // Save sales data to localStorage
+        function saveSalesData() {
+            try {
+                const today = new Date().toDateString();
+                localStorage.setItem(`salesData_${today}`, JSON.stringify(salesData));
+            } catch (error) {
+                console.error('Error saving sales data:', error);
+            }
+        }
+
+        // Generate unique transaction ID
+        function generateTransactionId() {
+            return Date.now().toString(36) + Math.random().toString(36).substr(2);
+        }
+
+        // Safe array check
+        function safeArray(arr) {
+            return Array.isArray(arr) ? arr : [];
+        }
+
+        // Render products
+        function renderProducts() {
+            try {
+                if (!products || typeof products !== 'object') {
+                    console.error('Products data not available');
+                    return;
+                }
+
+                Object.keys(products).forEach(category => {
+                    const container = document.getElementById(`${category}Container`);
+                    if (!container) return;
+                    
+                    container.innerHTML = '';
+                    
+                    if (!Array.isArray(products[category])) {
+                        console.error(`Products[${category}] is not an array`);
+                        return;
+                    }
+                    
+                    products[category].forEach((product, index) => {
+                        if (!product || typeof product.price !== 'number') {
+                            console.error(`Invalid product data for ${category}[${index}]`);
+                            return;
+                        }
+
+                        const itemKey = `${category}_${index}`;
+                        const itemData = salesData[itemKey] || { transactions: [] };
+                        
+                        // Ensure transactions is always an array
+                        if (!Array.isArray(itemData.transactions)) {
+                            itemData.transactions = [];
+                            salesData[itemKey] = itemData;
+                        }
+                        
+                        const itemCard = document.createElement('div');
+                        itemCard.className = 'item-card';
+                        
+                        let transactionsHTML = '';
+                        const transactions = safeArray(itemData.transactions);
+                        
+                        if (transactions.length === 0) {
+                            transactionsHTML = '<div class="empty-state">No transactions yet</div>';
+                        } else {
+                            transactions.forEach((transaction, transIndex) => {
+                                if (!transaction || typeof transaction.quantity !== 'number') {
+                                    console.error(`Invalid transaction data for ${itemKey}[${transIndex}]`);
+                                    return;
+                                }
+
+                                const quantity = Math.max(1, parseInt(transaction.quantity) || 1);
+                                const paymentMethod = transaction.paymentMethod === 'card' ? 'card' : 'cash';
+                                
+                                transactionsHTML += `
+                                    <div class="transaction-row">
+                                        <input type="number" class="transaction-qty" value="${quantity}" 
+                                               onchange="updateTransaction('${itemKey}', ${transIndex}, 'quantity', this.value)" min="1">
+                                        <div class="payment-toggle">
+                                            <button class="payment-option ${paymentMethod === 'cash' ? 'active' : ''}" 
+                                                    onclick="updateTransaction('${itemKey}', ${transIndex}, 'paymentMethod', 'cash')">Cash</button>
+                                            <button class="payment-option ${paymentMethod === 'card' ? 'active' : ''}" 
+                                                    onclick="updateTransaction('${itemKey}', ${transIndex}, 'paymentMethod', 'card')">Card</button>
+                                        </div>
+                                        <div class="transaction-total">$${(quantity * product.price).toFixed(2)}</div>
+                                        <button class="delete-transaction" onclick="deleteTransaction('${itemKey}', ${transIndex})">×</button>
+                                    </div>
+                                `;
+                            });
+                        }
+
+                        const totalQuantity = transactions.reduce((sum, t) => sum + (parseInt(t.quantity) || 0), 0);
+                        const totalAmount = totalQuantity * product.price;
+                        const cashTransactions = transactions.filter(t => t.paymentMethod === 'cash').length;
+                        const cardTransactions = transactions.filter(t => t.paymentMethod === 'card').length;
+
+                        itemCard.innerHTML = `
+                            <div class="item-header">
+                                <div class="item-name">${product.name}</div>
+                                <div class="item-price">$${product.price.toFixed(2)}</div>
+                            </div>
+                            <div class="transactions-container">
+                                ${transactionsHTML}
+                            </div>
+                            <button class="add-transaction" onclick="addTransaction('${itemKey}')">+ Add Transaction</button>
+                            ${totalQuantity > 0 ? `
+                                <div class="item-summary">
+                                    <span>Total: ${totalQuantity} items</span>
+                                    <span>Cash: ${cashTransactions} | Card: ${cardTransactions}</span>
+                                    <span>$${totalAmount.toFixed(2)}</span>
+                                </div>
+                            ` : ''}
+                        `;
+                        
+                        container.appendChild(itemCard);
+                    });
+                });
+            } catch (error) {
+                console.error('Error rendering products:', error);
+            }
+        }
+
+        // Add new transaction
+        function addTransaction(itemKey) {
+            try {
+                if (!salesData[itemKey]) {
+                    salesData[itemKey] = { transactions: [] };
+                }
+                
+                if (!Array.isArray(salesData[itemKey].transactions)) {
+                    salesData[itemKey].transactions = [];
+                }
+                
+                salesData[itemKey].transactions.push({
+                    id: generateTransactionId(),
+                    quantity: 1,
+                    paymentMethod: 'cash'
+                });
+                
+                saveSalesData();
+                renderProducts();
+                updateTotals();
+            } catch (error) {
+                console.error('Error adding transaction:', error);
+            }
+        }
+
+        // Update transaction
+        function updateTransaction(itemKey, transIndex, field, value) {
+            try {
+                if (!salesData[itemKey] || !Array.isArray(salesData[itemKey].transactions)) {
+                    console.error('Invalid transaction data structure');
+                    return;
+                }
+                
+                if (transIndex >= salesData[itemKey].transactions.length) {
+                    console.error('Transaction index out of bounds');
+                    return;
+                }
+                
+                if (field === 'quantity') {
+                    value = parseInt(value) || 1;
+                    if (value < 1) value = 1;
+                }
+                
+                salesData[itemKey].transactions[transIndex][field] = value;
+                saveSalesData();
+                renderProducts();
+                updateTotals();
+            } catch (error) {
+                console.error('Error updating transaction:', error);
+            }
+        }
+
+        // Delete transaction
+        function deleteTransaction(itemKey, transIndex) {
+            try {
+                if (confirm('Delete this transaction?')) {
+                    if (!salesData[itemKey] || !Array.isArray(salesData[itemKey].transactions)) {
+                        console.error('Invalid transaction data structure');
+                        return;
+                    }
+                    
+                    salesData[itemKey].transactions.splice(transIndex, 1);
+                    if (salesData[itemKey].transactions.length === 0) {
+                        delete salesData[itemKey];
+                    }
+                    saveSalesData();
+                    renderProducts();
+                    updateTotals();
+                }
+            } catch (error) {
+                console.error('Error deleting transaction:', error);
+            }
+        }
+
+        // Update totals
+        function updateTotals() {
+            try {
+                let cashTotal = 0;
+                let cardTotal = 0;
+                let itemCount = 0;
+                let transactionCount = 0;
+
+                Object.keys(salesData).forEach(itemKey => {
+                    try {
+                        const [category, index] = itemKey.split('_');
+                        const categoryIndex = parseInt(index);
+                        
+                        if (!products[category] || !products[category][categoryIndex]) {
+                            console.error(`Invalid product reference: ${itemKey}`);
+                            return;
+                        }
+                        
+                        const product = products[category][categoryIndex];
+                        const itemData = salesData[itemKey];
+                        
+                        if (!itemData || !Array.isArray(itemData.transactions)) {
+                            return;
+                        }
+                        
+                        itemData.transactions.forEach(transaction => {
+                            if (!transaction || typeof transaction.quantity !== 'number') {
+                                return;
+                            }
+                            
+                            const quantity = parseInt(transaction.quantity) || 0;
+                            const transactionTotal = quantity * product.price;
+                            
+                            if (transaction.paymentMethod === 'cash') {
+                                cashTotal += transactionTotal;
+                            } else {
+                                cardTotal += transactionTotal;
+                            }
+                            
+                            itemCount += quantity;
+                            transactionCount++;
+                        });
+                    } catch (error) {
+                        console.error(`Error processing item ${itemKey}:`, error);
+                    }
+                });
+
+                document.getElementById('cashTotal').textContent = `$${cashTotal.toFixed(2)}`;
+                document.getElementById('cardTotal').textContent = `$${cardTotal.toFixed(2)}`;
+                document.getElementById('itemCount').textContent = itemCount;
+                document.getElementById('transactionCount').textContent = transactionCount;
+                document.getElementById('grandTotal').textContent = `$${(cashTotal + cardTotal).toFixed(2)}`;
+            } catch (error) {
+                console.error('Error updating totals:', error);
+            }
+        }
+
+        // Update date display
+        function updateDate() {
+            try {
+                const now = new Date();
+                const options = { 
+                    weekday: 'long', 
+                    year: 'numeric', 
+                    month: 'long', 
+                    day: 'numeric' 
+                };
+                document.getElementById('currentDate').textContent = now.toLocaleDateString('en-US', options);
+            } catch (error) {
+                console.error('Error updating date:', error);
+            }
+        }
+
+        // Show summary
+        function showSummary() {
+            try {
+                const modal = document.getElementById('summaryModal');
+                const content = document.getElementById('summaryContent');
+                
+                let summaryHTML = '<h2>Day Summary</h2>';
+                let cashTotal = 0;
+                let cardTotal = 0;
+                let totalTransactions = 0;
+                
+                Object.keys(products).forEach(category => {
+                    let categoryHTML = `<h3>${category.charAt(0).toUpperCase() + category.slice(1)}</h3>`;
+                    let categoryHasItems = false;
+                    
+                    products[category].forEach((product, index) => {
+                        const itemKey = `${category}_${index}`;
+                        const itemData = salesData[itemKey];
+                        
+                        if (itemData && Array.isArray(itemData.transactions) && itemData.transactions.length > 0) {
+                            categoryHasItems = true;
+                            categoryHTML += `<div style="margin-left: 15px;"><strong>${product.name}</strong></div>`;
+                            
+                            itemData.transactions.forEach((transaction, transIndex) => {
+                                if (transaction && typeof transaction.quantity === 'number') {
+                                    const quantity = parseInt(transaction.quantity) || 0;
+                                    const transactionTotal = quantity * product.price;
+                                    categoryHTML += `
+                                        <div style="margin-left: 25px; display: flex; justify-content: space-between; margin: 5px 0;">
+                                            <span>Transaction ${transIndex + 1}: ${quantity} item(s)</span>
+                                            <span>$${transactionTotal.toFixed(2)} (${(transaction.paymentMethod || 'cash').toUpperCase()})</span>
+                                        </div>
+                                    `;
+                                    
+                                    if (transaction.paymentMethod === 'cash') {
+                                        cashTotal += transactionTotal;
+                                    } else {
+                                        cardTotal += transactionTotal;
+                                    }
+                                    totalTransactions++;
+                                }
+                            });
+                        }
+                    });
+                    
+                    if (categoryHasItems) {
+                        summaryHTML += categoryHTML;
+                    }
+                });
+                
+                summaryHTML += `
+                    <hr style="margin: 20px 0;">
+                    <div style="font-weight: bold;">
+                        <div>Total Transactions: ${totalTransactions}</div>
+                        <div>Cash Total: $${cashTotal.toFixed(2)}</div>
+                        <div>Card Total: $${cardTotal.toFixed(2)}</div>
+                        <div>Grand Total: $${(cashTotal + cardTotal).toFixed(2)}</div>
+                    </div>
+                `;
+                
+                content.innerHTML = summaryHTML;
+                modal.style.display = 'block';
+            } catch (error) {
+                console.error('Error showing summary:', error);
+            }
+        }
+
+        // Close summary
+        function closeSummary() {
+            document.getElementById('summaryModal').style.display = 'none';
+        }
+
+        // Reset day
+        function resetDay() {
+            if (confirm('Are you sure you want to reset all data for today?')) {
+                salesData = {};
+                saveSalesData();
+                renderProducts();
+                updateTotals();
+            }
+        }
+
+        // Initialize app when page loads
+        document.addEventListener('DOMContentLoaded', init);
+
+        // Close modal when clicking outside
+        window.onclick = function(event) {
+            const modal = document.getElementById('summaryModal');
+            if (event.target === modal) {
+                closeSummary();
+            }
+        }
+    </script>
+</body>
+</html>
