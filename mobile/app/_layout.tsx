@@ -7,8 +7,44 @@ import { useFonts, Outfit_400Regular, Outfit_600SemiBold, Outfit_700Bold } from 
 import { View, ActivityIndicator } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 
+import * as Updates from 'expo-updates';
+import { useEffect } from 'react';
+import { Alert } from 'react-native';
+
 function RootLayoutContent() {
   const { colorScheme } = useTheme();
+
+  async function onFetchUpdateAsync() {
+    try {
+      const update = await Updates.checkForUpdateAsync();
+
+      if (update.isAvailable) {
+        Alert.alert(
+          'Update Available',
+          'A new version of the app is available. Would you like to update now?',
+          [
+            { text: 'Later', style: 'cancel' },
+            {
+              text: 'Update',
+              onPress: async () => {
+                await Updates.fetchUpdateAsync();
+                await Updates.reloadAsync();
+              },
+            },
+          ]
+        );
+      }
+    } catch (error) {
+      // You can also add an alert() to see the error message in case of an error when fetching updates.
+      console.log(`Error fetching latest Expo update: ${error}`);
+    }
+  }
+
+  useEffect(() => {
+    if (!__DEV__) {
+      onFetchUpdateAsync();
+    }
+  }, []);
 
   return (
     <>
