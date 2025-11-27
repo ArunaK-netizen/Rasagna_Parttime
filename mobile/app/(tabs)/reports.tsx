@@ -8,12 +8,15 @@ import { Calendar } from 'react-native-calendars';
 import { useState } from 'react';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
+import { useRouter } from 'expo-router';
+import * as Haptics from 'expo-haptics';
 
 const { width } = Dimensions.get('window');
 
 export default function ReportsScreen() {
     const { transactions } = useSales();
     const { colorScheme } = useTheme();
+    const router = useRouter();
     const isDark = colorScheme === 'dark';
     const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
 
@@ -66,6 +69,8 @@ export default function ReportsScreen() {
             selectedTextColor: '#ffffff',
         };
     }
+
+
 
     const generateDayReport = async () => {
         try {
@@ -311,6 +316,7 @@ export default function ReportsScreen() {
                                 </Text>
                             </TouchableOpacity>
                         </View>
+
                     </View>
 
                     {/* Weekly Chart */}
@@ -555,5 +561,86 @@ const styles = StyleSheet.create({
     },
     statValueDark: {
         color: '#ffffff',
+    },
+    transactionsList: {
+        marginTop: 16,
+    },
+    transactionItem: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        backgroundColor: '#ffffff',
+        padding: 16,
+        borderRadius: 16,
+        marginBottom: 12,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.05,
+        shadowRadius: 4,
+        elevation: 2,
+    },
+    transactionItemDark: {
+        backgroundColor: '#1c1c1e',
+        shadowOpacity: 0.2,
+    },
+    transactionLeft: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+    },
+    iconContainer: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: '#f2f2f7',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    iconContainerDark: {
+        backgroundColor: '#2c2c2e',
+    },
+    iconText: {
+        fontSize: 20,
+    },
+    productName: {
+        fontSize: 16,
+        fontFamily: 'Outfit_600SemiBold',
+        color: '#000000',
+        marginBottom: 2,
+    },
+    productNameDark: {
+        color: '#ffffff',
+    },
+    transactionTime: {
+        fontSize: 13,
+        color: '#8e8e93',
+        fontFamily: 'Outfit_400Regular',
+    },
+    transactionRight: {
+        alignItems: 'flex-end',
+    },
+    transactionAmount: {
+        fontSize: 16,
+        fontFamily: 'Outfit_700Bold',
+        color: '#000000',
+        marginBottom: 2,
+    },
+    transactionAmountDark: {
+        color: '#ffffff',
+    },
+    tipText: {
+        fontSize: 12,
+        color: '#34C759',
+        fontFamily: 'Outfit_500Medium',
+    },
+    emptyText: {
+        textAlign: 'center',
+        color: '#8e8e93',
+        marginTop: 20,
+        fontFamily: 'Outfit_400Regular',
+        fontSize: 15,
+    },
+    emptyTextDark: {
+        color: '#98989d',
     },
 });

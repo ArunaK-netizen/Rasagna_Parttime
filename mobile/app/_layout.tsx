@@ -2,6 +2,7 @@ import '../global.css';
 import { Stack } from 'expo-router';
 import { SalesProvider } from '../context/SalesContext';
 import { ThemeProvider } from '../context/ThemeContext';
+import { ProductProvider } from '../context/ProductContext';
 import { useTheme } from '../hooks/useTheme';
 import { useFonts, Outfit_400Regular, Outfit_600SemiBold, Outfit_700Bold } from '@expo-google-fonts/outfit';
 import { View, ActivityIndicator } from 'react-native';
@@ -76,9 +77,11 @@ export default function RootLayout() {
 
   return (
     <ThemeProvider>
-      <SalesProvider>
-        <RootLayoutContent />
-      </SalesProvider>
+      <ProductProvider>
+        <SalesProvider>
+          <RootLayoutContent />
+        </SalesProvider>
+      </ProductProvider>
     </ThemeProvider>
   );
 }

@@ -46,5 +46,13 @@ export const useSalesData = () => {
         await saveData(STORAGE_KEYS.TRANSACTIONS, updated);
     };
 
-    return { transactions, loading, addTransaction, deleteTransaction };
+    const updateTransaction = async (updatedTransaction: Transaction) => {
+        const updated = transactions.map(t =>
+            t.id === updatedTransaction.id ? updatedTransaction : t
+        );
+        setTransactions(updated);
+        await saveData(STORAGE_KEYS.TRANSACTIONS, updated);
+    };
+
+    return { transactions, loading, addTransaction, deleteTransaction, updateTransaction };
 };

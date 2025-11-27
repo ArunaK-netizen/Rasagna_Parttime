@@ -5,10 +5,13 @@ import { useSales } from '../../context/SalesContext';
 import { useTheme } from '../../hooks/useTheme';
 import { useState } from 'react';
 import { format } from 'date-fns';
+import { useRouter } from 'expo-router';
+import * as Haptics from 'expo-haptics';
 
 export default function CalendarScreen() {
     const { transactions } = useSales();
     const { colorScheme } = useTheme();
+    const router = useRouter();
     const isDark = colorScheme === 'dark';
     const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
 
@@ -36,6 +39,24 @@ export default function CalendarScreen() {
     const totalForDate = selectedDateTransactions.reduce(
         (sum, t) => sum + (t.price * t.quantity), 0
     );
+
+    const handleTransactionPress = (transaction: any) => {
+        Haptics.selectionAsync();
+        router.push({
+            pathname: "/edit-transaction" as any,
+            params: {
+                id: transaction.id,
+                productName: transaction.productName,
+                category: transaction.category,
+                price: transaction.price.toString(),
+                quantity: transaction.quantity.toString(),
+                tip: (transaction.tip || 0).toString(),
+                paymentMethod: transaction.paymentMethod,
+                timestamp: transaction.timestamp.toString(),
+                date: transaction.date,
+            }
+        });
+    };
 
     return (
         <View style={[styles.container, isDark && styles.containerDark]}>
@@ -90,7 +111,11 @@ export default function CalendarScreen() {
                             keyExtractor={(item, index) => `${item.productName}-${index}`}
                             contentContainerStyle={styles.transactionsList}
                             renderItem={({ item }) => (
-                                <View style={[styles.transactionCard, isDark && styles.transactionCardDark]}>
+                                <TouchableOpacity
+                                    onPress={() => handleTransactionPress(item)}
+                                    activeOpacity={0.7}
+                                    style={[styles.transactionCard, isDark && styles.transactionCardDark]}
+                                >
                                     <View style={styles.transactionMain}>
                                         <Text style={[styles.productName, isDark && styles.productNameDark]}>
                                             {item.productName}
@@ -108,7 +133,7 @@ export default function CalendarScreen() {
                                             {item.tip > 0 && ` +$${item.tip.toFixed(2)}`}
                                         </Text>
                                     </View>
-                                </View>
+                                </TouchableOpacity>
                             )}
                         />
                     </View>

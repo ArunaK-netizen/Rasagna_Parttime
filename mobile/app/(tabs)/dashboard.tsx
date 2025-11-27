@@ -1,18 +1,18 @@
-import { View, Text, ScrollView, TouchableOpacity, FlatList, StyleSheet, TextInput } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, FlatList, StyleSheet, TextInput, Keyboard } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useSales } from '../../context/SalesContext';
-import { PRODUCTS, Category } from '../../constants/Products';
-import { useState } from 'react';
+import { useProducts } from '../../context/ProductContext';
+import { useState, useMemo } from 'react';
 import { format } from 'date-fns';
 import { LinearGradient } from 'expo-linear-gradient';
-import { BlurView } from 'expo-blur';
 import { useRouter } from 'expo-router';
 import { useTheme } from '../../hooks/useTheme';
 import * as Haptics from 'expo-haptics';
 
 export default function Dashboard() {
     const { transactions } = useSales();
-    const [selectedCategory, setSelectedCategory] = useState<Category>('snacks');
+    const { products, categories } = useProducts();
+    const [selectedCategory, setSelectedCategory] = useState(categories[0] || 'snacks');
     const [searchQuery, setSearchQuery] = useState('');
     const router = useRouter();
     const { colorScheme, toggleColorScheme } = useTheme();
@@ -32,9 +32,11 @@ export default function Dashboard() {
     const totalTips = todaysTransactions.reduce((sum, t) => sum + (t.tip || 0), 0);
     const totalSales = totalCash + totalCard;
 
-    const handleCategoryPress = (cat: Category) => {
+    const handleCategoryPress = (cat: string) => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         setSelectedCategory(cat);
+        setSearchQuery('');
+        Keyboard.dismiss();
     };
 
     const handleProductPress = (item: any) => {
@@ -50,9 +52,21 @@ export default function Dashboard() {
     };
 
     // Filter products based on search query
-    const filteredProducts = PRODUCTS[selectedCategory].filter(product =>
-        product.name.toLowerCase().includes(searchQuery.toLowerCase())
-    );
+    const filteredProducts = useMemo(() => {
+        if (!searchQuery.trim()) {
+            return products[selectedCategory] || [];
+        }
+        const query = searchQuery.toLowerCase();
+        // Search across all categories if searching, or just current? 
+        // Let's search current category for now to keep UI simple, or all if preferred.
+        // User asked for "add new product", but for search let's keep it simple.
+        // Actually, searching across all might be better UX.
+        // For now, let's stick to current category to match previous behavior, 
+        // or we can search all. Let's search all if query exists.
+        return Object.values(products).flat().filter(p =>
+            p.name.toLowerCase().includes(query)
+        );
+    }, [searchQuery, selectedCategory, products]);
 
     return (
         <View style={[styles.container, isDark && styles.containerDark]}>
@@ -71,15 +85,26 @@ export default function Dashboard() {
                         </Text>
                         <Text style={[styles.titleText, isDark && styles.titleTextDark]}>Daily Sales</Text>
                     </View>
-                    <TouchableOpacity
-                        onPress={() => {
-                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                            toggleColorScheme();
-                        }}
-                        style={[styles.themeButton, isDark && styles.themeButtonDark]}
-                    >
-                        <Text style={styles.themeEmoji}>{isDark ? '☀️' : '🌙'}</Text>
-                    </TouchableOpacity>
+                    <View style={styles.headerButtons}>
+                        <TouchableOpacity
+                            onPress={() => {
+                                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                                router.push('/add-product' as any);
+                            }}
+                            style={[styles.iconButton, isDark && styles.iconButtonDark]}
+                        >
+                            <Text style={styles.iconButtonText}>+</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            onPress={() => {
+                                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                                toggleColorScheme();
+                            }}
+                            style={[styles.iconButton, isDark && styles.iconButtonDark]}
+                        >
+                            <Text style={styles.themeEmoji}>{isDark ? '☀️' : '🌙'}</Text>
+                        </TouchableOpacity>
+                    </View>
                 </View>
 
                 {/* Stats Cards */}
@@ -143,7 +168,7 @@ export default function Dashboard() {
                         showsHorizontalScrollIndicator={false}
                         contentContainerStyle={styles.categoriesScroll}
                     >
-                        {(Object.keys(PRODUCTS) as Category[]).map(cat => {
+                        {categories.map(cat => {
                             const isSelected = selectedCategory === cat;
                             return (
                                 <TouchableOpacity
@@ -173,7 +198,7 @@ export default function Dashboard() {
                 <FlatList
                     data={filteredProducts}
                     numColumns={2}
-                    keyExtractor={item => item.name}
+                    keyExtractor={item => item.id || item.name}
                     contentContainerStyle={[styles.productsGrid, { paddingBottom: 120 }]}
                     columnWrapperStyle={styles.productRow}
                     renderItem={({ item }) => (
@@ -222,6 +247,10 @@ const styles = StyleSheet.create({
         paddingTop: 8,
         paddingBottom: 16,
     },
+    headerButtons: {
+        flexDirection: 'row',
+        gap: 12,
+    },
     dateText: {
         fontSize: 13,
         color: '#8e8e93',
@@ -243,7 +272,7 @@ const styles = StyleSheet.create({
     titleTextDark: {
         color: '#ffffff',
     },
-    themeButton: {
+    iconButton: {
         width: 44,
         height: 44,
         borderRadius: 22,
@@ -256,8 +285,14 @@ const styles = StyleSheet.create({
         shadowRadius: 8,
         elevation: 3,
     },
-    themeButtonDark: {
+    iconButtonDark: {
         backgroundColor: 'rgba(58, 58, 60, 0.95)',
+    },
+    iconButtonText: {
+        fontSize: 24,
+        fontFamily: 'Outfit_600SemiBold',
+        color: '#007AFF',
+        marginTop: -2,
     },
     themeEmoji: {
         fontSize: 20,

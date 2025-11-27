@@ -6,6 +6,7 @@ type SalesContextType = {
     loading: boolean;
     addTransaction: (t: Omit<Transaction, 'id' | 'timestamp'>) => Promise<void>;
     deleteTransaction: (id: string) => Promise<void>;
+    updateTransaction: (t: Transaction) => Promise<void>;
 };
 
 const SalesContext = createContext<SalesContextType | undefined>(undefined);
