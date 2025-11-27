@@ -43,7 +43,8 @@ jobs:
         run: npx expo prebuild --platform android --no-install
 
       - name: Configure Bundle in Debug
-        run: sed -i 's/project.ext.react = \[/project.ext.react = \[\n        bundleInDebug: true,/' android/app/build.gradle
+        run: |
+          sed -i 's/project.ext.react = \[/project.ext.react = \[\n        bundleInDebug: true,/' android/app/build.gradle
 
       - name: Build APK
         run: |
