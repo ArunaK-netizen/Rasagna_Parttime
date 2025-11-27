@@ -32,7 +32,8 @@ jobs:
         run: npm install -g eas-cli
 
       - name: Publish OTA Update
-        run: eas update --channel production --message "Commit: ${{ github.sha }}"
+        run: |
+          eas update --channel production --message "Commit: ${{ github.sha }}"
         env:
           EXPO_TOKEN: ${{ secrets.EAS_TOKEN }}
 
