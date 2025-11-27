@@ -1,4 +1,4 @@
-name: Build Android APK
+name: Build Android APK with EAS
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
 
 jobs:
   build:
-    name: Build APK
+    name: Build Production APK with EAS
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -27,43 +27,31 @@ jobs:
           cache: 'npm'
           cache-dependency-path: mobile/package-lock.json
 
-      - name: Setup Java
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'zulu'
-          java-version: '17'
-
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-
       - name: Install dependencies
         run: npm ci
 
-      - name: Prebuild
-        run: npx expo prebuild --platform android --no-install
+      - name: Install EAS CLI
+        run: npm install -g eas-cli
 
-      - name: Build Release APK (unsigned)
-        run: |
-          cd android
-          chmod +x gradlew
-          ./gradlew assembleRelease --no-daemon
+      - name: Build with EAS
+        run: eas build --platform android --profile production --non-interactive
+        env:
+          EAS_TOKEN: ${{ secrets.EAS_TOKEN }}
 
-      - name: Rename Release APK
+      - name: Download APK artifact
         run: |
-          mkdir -p android/app/build/outputs/apk/release
-          if [ -f android/app/build/outputs/apk/release/app-release.apk ]; then \
-            mv android/app/build/outputs/apk/release/app-release.apk android/app/build/outputs/apk/release/parttime-release.apk; \
-          elif [ -f android/app/build/outputs/apk/release/app-release-unsigned.apk ]; then \
-            mv android/app/build/outputs/apk/release/app-release-unsigned.apk android/app/build/outputs/apk/release/parttime-release-unsigned.apk; \
-          else \
-            echo "Release APK not found"; ls -R android/app/build/outputs/apk || true; exit 1; \
-          fi
+          # EAS outputs artifacts; we'll poll for the build to complete and download
+          BUILD_ID=$(eas build list --platform android --status finished --limit 1 --json | jq -r '.[0].id')
+          echo "Build ID: $BUILD_ID"
+          eas artifact download $BUILD_ID --non-interactive --output-dir ./artifacts
+        env:
+          EAS_TOKEN: ${{ secrets.EAS_TOKEN }}
 
       - name: Upload Release Artifact
         uses: actions/upload-artifact@v4
         with:
           name: parttime-release
-          path: mobile/android/app/build/outputs/apk/release/
+          path: ./mobile/artifacts/
 
       - name: Release APK
         uses: softprops/action-gh-release@v1
@@ -72,6 +60,6 @@ jobs:
           name: Latest Release Build
           draft: false
           prerelease: false
-          files: mobile/android/app/build/outputs/apk/release/
+          files: ./mobile/artifacts/*.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
