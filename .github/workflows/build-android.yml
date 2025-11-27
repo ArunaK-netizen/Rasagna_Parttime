@@ -13,6 +13,9 @@ jobs:
       run:
         working-directory: ./mobile
 
+    permissions:
+      contents: write
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -44,6 +47,9 @@ jobs:
           cd android
           chmod +x gradlew
           ./gradlew assembleDebug --no-daemon
+
+      - name: Rename APK
+        run: mv mobile/android/app/build/outputs/apk/debug/app-debug.apk mobile/android/app/build/outputs/apk/debug/parttime.apk
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
