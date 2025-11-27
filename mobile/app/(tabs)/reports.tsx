@@ -318,6 +318,7 @@ export default function ReportsScreen() {
                         <Text style={[styles.cardTitle, isDark && styles.cardTitleDark]}>Last 7 Days</Text>
                         <View style={styles.chartContainer}>
                             <BarChart
+                                key={totalRevenue} // Force re-render when data changes
                                 data={weekData}
                                 barWidth={28}
                                 noOfSections={4}

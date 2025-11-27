@@ -42,28 +42,36 @@ jobs:
       - name: Prebuild
         run: npx expo prebuild --platform android --no-install
 
-      - name: Build APK
+      - name: Build Release APK (unsigned)
         run: |
           cd android
           chmod +x gradlew
-          ./gradlew assembleDebug --no-daemon
+          ./gradlew assembleRelease --no-daemon
 
-      - name: Rename APK
-        run: mv android/app/build/outputs/apk/debug/app-debug.apk android/app/build/outputs/apk/debug/parttime.apk
+      - name: Rename Release APK
+        run: |
+          mkdir -p android/app/build/outputs/apk/release
+          if [ -f android/app/build/outputs/apk/release/app-release.apk ]; then \
+            mv android/app/build/outputs/apk/release/app-release.apk android/app/build/outputs/apk/release/parttime-release.apk; \
+          elif [ -f android/app/build/outputs/apk/release/app-release-unsigned.apk ]; then \
+            mv android/app/build/outputs/apk/release/app-release-unsigned.apk android/app/build/outputs/apk/release/parttime-release-unsigned.apk; \
+          else \
+            echo "Release APK not found"; ls -R android/app/build/outputs/apk || true; exit 1; \
+          fi
 
-      - name: Upload Artifact
+      - name: Upload Release Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: parttime
-          path: mobile/android/app/build/outputs/apk/debug/parttime.apk
+          name: parttime-release
+          path: mobile/android/app/build/outputs/apk/release/
 
       - name: Release APK
         uses: softprops/action-gh-release@v1
         with:
           tag_name: latest
-          name: Latest Build
+          name: Latest Release Build
           draft: false
           prerelease: false
-          files: mobile/android/app/build/outputs/apk/debug/parttime.apk
+          files: mobile/android/app/build/outputs/apk/release/
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
