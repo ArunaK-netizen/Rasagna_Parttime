@@ -2,6 +2,7 @@ import { Tabs } from 'expo-router';
 import { BlurView } from 'expo-blur';
 import { Platform, View, Text, StyleSheet } from 'react-native';
 import { useTheme } from '../../hooks/useTheme';
+import { Ionicons } from '@expo/vector-icons';
 
 export default function TabLayout() {
   const { colorScheme } = useTheme();
@@ -48,7 +49,7 @@ export default function TabLayout() {
               styles.iconContainer,
               focused && styles.iconContainerFocused
             ]}>
-              <Text style={{ fontSize: 26, color }}>🏠</Text>
+              <Ionicons name={focused ? "home" : "home-outline"} size={24} color={color} />
             </View>
           ),
         }}
@@ -62,7 +63,7 @@ export default function TabLayout() {
               styles.iconContainer,
               focused && styles.iconContainerFocused
             ]}>
-              <Text style={{ fontSize: 26, color }}>📅</Text>
+              <Ionicons name={focused ? "calendar" : "calendar-outline"} size={24} color={color} />
             </View>
           ),
         }}
@@ -76,7 +77,7 @@ export default function TabLayout() {
               styles.iconContainer,
               focused && styles.iconContainerFocused
             ]}>
-              <Text style={{ fontSize: 26, color }}>📊</Text>
+              <Ionicons name={focused ? "bar-chart" : "bar-chart-outline"} size={24} color={color} />
             </View>
           ),
         }}

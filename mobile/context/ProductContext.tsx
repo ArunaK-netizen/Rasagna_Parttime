@@ -1,6 +1,6 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { PRODUCTS as INITIAL_PRODUCTS } from '../constants/Products';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import React, { createContext, useContext, useEffect, useState } from 'react';
+import { PRODUCTS as INITIAL_PRODUCTS } from '../constants/Products';
 
 export type Product = {
     id: string;
@@ -43,7 +43,30 @@ export const ProductProvider = ({ children }: { children: React.ReactNode }) => 
         try {
             const stored = await AsyncStorage.getItem(STORAGE_KEY);
             if (stored) {
-                setProducts(JSON.parse(stored));
+                const parsed = JSON.parse(stored) as Record<string, Product[]>;
+
+                // Migrate stored prices to match current `INITIAL_PRODUCTS` list by name/category.
+                const migrated: Record<string, Product[]> = {};
+
+                Object.entries(parsed).forEach(([category, items]) => {
+                    // Find the initial products for this category (if any)
+                    const initialForCategory = (INITIAL_PRODUCTS as Record<string, { name: string; price: number }[]>)[category];
+
+                    migrated[category] = items.map(item => {
+                        if (initialForCategory) {
+                            const match = initialForCategory.find(p => p.name === item.name);
+                            if (match) {
+                                // Keep id and other fields, but update price to the current initial value
+                                return { ...item, price: match.price };
+                            }
+                        }
+                        return item;
+                    });
+                });
+
+                setProducts(migrated);
+                // Persist migrated data so subsequent runs use the corrected prices
+                await saveProducts(migrated);
             }
         } catch (e) {
             console.error('Failed to load products', e);

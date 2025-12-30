@@ -1,6 +1,6 @@
 export const PRODUCTS = {
     snacks: [
-        { name: 'Coolers', price: 12.00 },
+        { name: 'Coolers', price: 6.50 },
         { name: 'Cashews', price: 2.75 },
         { name: 'Peanuts', price: 1.50 },
         { name: 'Crackers', price: 2.75 },

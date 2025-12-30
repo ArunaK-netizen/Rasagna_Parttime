@@ -31,16 +31,17 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/splash-icon.png",
-          "imageWidth": 200,
+          "image": "./assets/images/splash_dark.png",
           "resizeMode": "contain",
-          "backgroundColor": "#ffffff",
+          "backgroundColor": "#121212",
           "dark": {
-            "backgroundColor": "#000000"
+            "image": "./assets/images/splash_dark.png",
+            "backgroundColor": "#121212"
           }
         }
       ],
-      "./plugins/withBundleInDebug.js"
+      "./plugins/withBundleInDebug.js",
+      "expo-web-browser"
     ],
     "updates": {
       "url": "https://u.expo.dev/a078c8db-7c35-4340-99f3-1d02e95e4ac5",
@@ -51,6 +52,7 @@
       "reactCompiler": true
     },
     "extra": {
+      "changelog": "Bug fixes and performance improvements",
       "router": {},
       "eas": {
         "projectId": "a078c8db-7c35-4340-99f3-1d02e95e4ac5"

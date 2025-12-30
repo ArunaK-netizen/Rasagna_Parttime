@@ -1,12 +1,13 @@
-import { View, Text, StyleSheet, FlatList, TouchableOpacity } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { format, parseISO } from 'date-fns';
+import * as Haptics from 'expo-haptics';
+import { useRouter } from 'expo-router';
+import { useState } from 'react';
+import { FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Calendar } from 'react-native-calendars';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import EditTransactionModal from '../../components/EditTransactionModal';
 import { useSales } from '../../context/SalesContext';
 import { useTheme } from '../../hooks/useTheme';
-import { useState } from 'react';
-import { format } from 'date-fns';
-import { useRouter } from 'expo-router';
-import * as Haptics from 'expo-haptics';
 
 export default function CalendarScreen() {
     const { transactions } = useSales();
@@ -14,6 +15,8 @@ export default function CalendarScreen() {
     const router = useRouter();
     const isDark = colorScheme === 'dark';
     const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+
+    const [editingTransaction, setEditingTransaction] = useState<any>(null);
 
     // Mark days with transactions
     const markedDates = transactions.reduce((acc, t) => {
@@ -37,25 +40,17 @@ export default function CalendarScreen() {
     const selectedDateTransactions = transactions.filter(t => t.date === selectedDate);
 
     const totalForDate = selectedDateTransactions.reduce(
-        (sum, t) => sum + (t.price * t.quantity), 0
+        (sum, t) => {
+            if (t.items) {
+                return sum + t.items.reduce((s, i) => s + (i.price * i.quantity), 0);
+            }
+            return sum + ((t.price || 0) * (t.quantity || 0));
+        }, 0
     );
 
     const handleTransactionPress = (transaction: any) => {
         Haptics.selectionAsync();
-        router.push({
-            pathname: "/edit-transaction" as any,
-            params: {
-                id: transaction.id,
-                productName: transaction.productName,
-                category: transaction.category,
-                price: transaction.price.toString(),
-                quantity: transaction.quantity.toString(),
-                tip: (transaction.tip || 0).toString(),
-                paymentMethod: transaction.paymentMethod,
-                timestamp: transaction.timestamp.toString(),
-                date: transaction.date,
-            }
-        });
+        setEditingTransaction(transaction);
     };
 
     return (
@@ -67,6 +62,7 @@ export default function CalendarScreen() {
 
                 <View style={[styles.calendarCard, isDark && styles.calendarCardDark]}>
                     <Calendar
+                        key={colorScheme}
                         theme={{
                             backgroundColor: 'transparent',
                             calendarBackground: 'transparent',
@@ -101,40 +97,58 @@ export default function CalendarScreen() {
                     <View style={styles.transactionsContainer}>
                         <View style={styles.transactionsHeader}>
                             <Text style={[styles.dateLabel, isDark && styles.dateLabelDark]}>
-                                {format(new Date(selectedDate), 'EEEE, MMM d')}
+                                {format(parseISO(selectedDate), 'EEEE, MMM d')}
                             </Text>
                             <Text style={styles.totalLabel}>${totalForDate.toFixed(2)}</Text>
                         </View>
 
                         <FlatList
                             data={selectedDateTransactions}
-                            keyExtractor={(item, index) => `${item.productName}-${index}`}
+                            keyExtractor={(item) => item.id}
                             contentContainerStyle={styles.transactionsList}
-                            renderItem={({ item }) => (
-                                <TouchableOpacity
-                                    onPress={() => handleTransactionPress(item)}
-                                    activeOpacity={0.7}
-                                    style={[styles.transactionCard, isDark && styles.transactionCardDark]}
-                                >
-                                    <View style={styles.transactionMain}>
-                                        <Text style={[styles.productName, isDark && styles.productNameDark]}>
-                                            {item.productName}
-                                        </Text>
-                                        <Text style={[styles.category, isDark && styles.categoryDark]}>
-                                            {item.category}  • {item.quantity}x
-                                        </Text>
-                                    </View>
-                                    <View style={styles.transactionDetails}>
-                                        <Text style={styles.amount}>
-                                            ${(item.price * item.quantity).toFixed(2)}
-                                        </Text>
-                                        <Text style={[styles.paymentMethod, isDark && styles.paymentMethodDark]}>
-                                            {item.paymentMethod.toUpperCase()}
-                                            {item.tip > 0 && ` +$${item.tip.toFixed(2)}`}
-                                        </Text>
-                                    </View>
-                                </TouchableOpacity>
-                            )}
+                            renderItem={({ item }) => {
+                                const isMultiItem = !!item.items;
+                                const totalAmount = isMultiItem
+                                    ? item.items.reduce((s: number, i: any) => s + (i.price * i.quantity), 0)
+                                    : ((item.price || 0) * (item.quantity || 0));
+
+                                const title = isMultiItem
+                                    ? `${item.items.length} Items`
+                                    : item.productName;
+
+                                const subtitle = isMultiItem
+                                    ? item.items.map((i: any) => i.productName).join(', ')
+                                    : `${item.category} • ${item.quantity}x`;
+
+                                return (
+                                    <TouchableOpacity
+                                        onPress={() => handleTransactionPress(item)}
+                                        activeOpacity={0.7}
+                                        style={[styles.transactionCard, isDark && styles.transactionCardDark]}
+                                    >
+                                        <View style={styles.transactionMain}>
+                                            <Text style={[styles.productName, isDark && styles.productNameDark]}>
+                                                {title}
+                                            </Text>
+                                            <Text
+                                                style={[styles.category, isDark && styles.categoryDark]}
+                                                numberOfLines={1}
+                                            >
+                                                {subtitle}
+                                            </Text>
+                                        </View>
+                                        <View style={styles.transactionDetails}>
+                                            <Text style={styles.amount}>
+                                                ${totalAmount.toFixed(2)}
+                                            </Text>
+                                            <Text style={[styles.paymentMethod, isDark && styles.paymentMethodDark]}>
+                                                {item.paymentMethod.toUpperCase()}
+                                                {item.tip > 0 && ` +$${item.tip.toFixed(2)}`}
+                                            </Text>
+                                        </View>
+                                    </TouchableOpacity>
+                                );
+                            }}
                         />
                     </View>
                 ) : (
@@ -146,6 +160,12 @@ export default function CalendarScreen() {
                     </View>
                 )}
             </SafeAreaView>
+
+            <EditTransactionModal
+                visible={!!editingTransaction}
+                transaction={editingTransaction}
+                onClose={() => setEditingTransaction(null)}
+            />
         </View>
     );
 }
@@ -163,13 +183,14 @@ const styles = StyleSheet.create({
     },
     header: {
         paddingHorizontal: 20,
-        paddingTop: 8,
-        paddingBottom: 16,
+        paddingTop: 20, // increased from 8 to match Reports
+        paddingBottom: 0, // moved spacing to title margin
     },
     title: {
         fontSize: 34,
         fontFamily: 'Outfit_700Bold',
         color: '#000000',
+        marginBottom: 20, // added to match Reports
         letterSpacing: -0.5,
         fontWeight: '700',
     },
@@ -179,8 +200,8 @@ const styles = StyleSheet.create({
     calendarCard: {
         marginHorizontal: 20,
         backgroundColor: '#ffffff',
-        borderRadius: 16,
-        padding: 12,
+        borderRadius: 20, // increased from 16 to match Reports
+        padding: 16, // increased from 12 to match Reports
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.08,

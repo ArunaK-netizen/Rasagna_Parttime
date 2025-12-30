@@ -1,19 +1,28 @@
-import { View, Text, ScrollView, TouchableOpacity, FlatList, StyleSheet, TextInput, Keyboard } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useSales } from '../../context/SalesContext';
-import { useProducts } from '../../context/ProductContext';
-import { useState, useMemo } from 'react';
+import { Ionicons } from '@expo/vector-icons';
 import { format } from 'date-fns';
+import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
+import { useMemo, useRef, useState } from 'react';
+import { FlatList, Keyboard, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import AddProductModal from '../../components/AddProductModal';
+import CheckoutModal from '../../components/CheckoutModal';
+import SettingsModal from '../../components/SettingsModal';
+import { useProducts } from '../../context/ProductContext';
+import { useSales } from '../../context/SalesContext';
 import { useTheme } from '../../hooks/useTheme';
-import * as Haptics from 'expo-haptics';
+// Mock PagerView for web to avoid native dependency issues during bundle
+const PagerView = Platform.OS === 'web' ? View : require('react-native-pager-view').default;
 
 export default function Dashboard() {
-    const { transactions } = useSales();
+    const { transactions, cart } = useSales();
     const { products, categories } = useProducts();
     const [selectedCategory, setSelectedCategory] = useState(categories[0] || 'snacks');
     const [searchQuery, setSearchQuery] = useState('');
+    const [isAddProductVisible, setIsAddProductVisible] = useState(false);
+    const [isCheckoutVisible, setIsCheckoutVisible] = useState(false);
+    const [isSettingsVisible, setIsSettingsVisible] = useState(false);
     const router = useRouter();
     const { colorScheme, toggleColorScheme } = useTheme();
     const isDark = colorScheme === 'dark';
@@ -23,20 +32,38 @@ export default function Dashboard() {
 
     const totalCash = todaysTransactions
         .filter(t => t.paymentMethod === 'cash')
-        .reduce((sum, t) => sum + (t.price * t.quantity), 0);
+        .reduce((sum, t) => {
+            if (t.items) {
+                return sum + t.items.reduce((s, i) => s + (i.price * i.quantity), 0);
+            }
+            return sum + ((t.price || 0) * (t.quantity || 0));
+        }, 0);
 
     const totalCard = todaysTransactions
         .filter(t => t.paymentMethod === 'card' || t.paymentMethod === 'upi')
-        .reduce((sum, t) => sum + (t.price * t.quantity), 0);
+        .reduce((sum, t) => {
+            if (t.items) {
+                return sum + t.items.reduce((s, i) => s + (i.price * i.quantity), 0);
+            }
+            return sum + ((t.price || 0) * (t.quantity || 0));
+        }, 0);
 
     const totalTips = todaysTransactions.reduce((sum, t) => sum + (t.tip || 0), 0);
     const totalSales = totalCash + totalCard;
 
+    const pagerRef = useRef<any>(null);
+
+    // Sync pager when category is selected via tap
     const handleCategoryPress = (cat: string) => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         setSelectedCategory(cat);
         setSearchQuery('');
         Keyboard.dismiss();
+
+        const index = categories.indexOf(cat);
+        if (index !== -1) {
+            pagerRef.current?.setPage(index);
+        }
     };
 
     const handleProductPress = (item: any) => {
@@ -51,22 +78,37 @@ export default function Dashboard() {
         });
     };
 
-    // Filter products based on search query
-    const filteredProducts = useMemo(() => {
-        if (!searchQuery.trim()) {
-            return products[selectedCategory] || [];
+    const onPageSelected = (e: any) => {
+        const index = e.nativeEvent.position;
+        const cat = categories[index];
+        if (cat && cat !== selectedCategory) {
+            setSelectedCategory(cat);
+            // Optional: scroll category list to view
         }
-        const query = searchQuery.toLowerCase();
-        // Search across all categories if searching, or just current? 
-        // Let's search current category for now to keep UI simple, or all if preferred.
-        // User asked for "add new product", but for search let's keep it simple.
-        // Actually, searching across all might be better UX.
-        // For now, let's stick to current category to match previous behavior, 
-        // or we can search all. Let's search all if query exists.
+    };
+
+    const renderProductItem = ({ item }: { item: any }) => (
+        <TouchableOpacity
+            style={[styles.productCard, isDark && styles.productCardDark]}
+            onPress={() => handleProductPress(item)}
+            activeOpacity={0.7}
+        >
+            <View style={styles.productContent}>
+                <Text style={[styles.productName, isDark && styles.productNameDark]}>
+                    {item.name}
+                </Text>
+                <Text style={styles.productPrice}>${item.price.toFixed(2)}</Text>
+            </View>
+        </TouchableOpacity>
+    );
+
+    // Filter products based on search query
+    const searchResults = useMemo(() => {
+        if (!searchQuery.trim()) return [];
         return Object.values(products).flat().filter(p =>
-            p.name.toLowerCase().includes(query)
+            p.name.toLowerCase().includes(searchQuery.toLowerCase())
         );
-    }, [searchQuery, selectedCategory, products]);
+    }, [searchQuery, products]);
 
     return (
         <View style={[styles.container, isDark && styles.containerDark]}>
@@ -89,11 +131,11 @@ export default function Dashboard() {
                         <TouchableOpacity
                             onPress={() => {
                                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                                router.push('/add-product' as any);
+                                setIsAddProductVisible(true);
                             }}
                             style={[styles.iconButton, isDark && styles.iconButtonDark]}
                         >
-                            <Text style={styles.iconButtonText}>+</Text>
+                            <Ionicons name="add" size={24} color={isDark ? "#0A84FF" : "#007AFF"} />
                         </TouchableOpacity>
                         <TouchableOpacity
                             onPress={() => {
@@ -102,7 +144,20 @@ export default function Dashboard() {
                             }}
                             style={[styles.iconButton, isDark && styles.iconButtonDark]}
                         >
-                            <Text style={styles.themeEmoji}>{isDark ? '☀️' : '🌙'}</Text>
+                            <Ionicons
+                                name={isDark ? "sunny" : "moon"}
+                                size={22}
+                                color={isDark ? "#0A84FF" : "#007AFF"}
+                            />
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            onPress={() => {
+                                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                                setIsSettingsVisible(true);
+                            }}
+                            style={[styles.iconButton, isDark && styles.iconButtonDark]}
+                        >
+                            <Ionicons name="server-outline" size={22} color={isDark ? "#0A84FF" : "#007AFF"} />
                         </TouchableOpacity>
                     </View>
                 </View>
@@ -194,29 +249,76 @@ export default function Dashboard() {
                     </ScrollView>
                 </View>
 
-                {/* Products Grid */}
-                <FlatList
-                    data={filteredProducts}
-                    numColumns={2}
-                    keyExtractor={item => item.id || item.name}
-                    contentContainerStyle={[styles.productsGrid, { paddingBottom: 120 }]}
-                    columnWrapperStyle={styles.productRow}
-                    renderItem={({ item }) => (
-                        <TouchableOpacity
-                            style={[styles.productCard, isDark && styles.productCardDark]}
-                            onPress={() => handleProductPress(item)}
-                            activeOpacity={0.7}
-                        >
-                            <View style={styles.productContent}>
-                                <Text style={[styles.productName, isDark && styles.productNameDark]}>
-                                    {item.name}
-                                </Text>
-                                <Text style={styles.productPrice}>${item.price.toFixed(2)}</Text>
+                {/* Products Grid or Pager */}
+                {searchQuery.trim().length > 0 ? (
+                    <FlatList
+                        showsVerticalScrollIndicator={false}
+                        data={searchResults}
+                        numColumns={2}
+                        keyExtractor={item => item.id || item.name}
+                        contentContainerStyle={[styles.productsGrid, { paddingBottom: 120 }]}
+                        columnWrapperStyle={styles.productRow}
+                        renderItem={renderProductItem}
+                    />
+                ) : (
+                    <PagerView
+                        ref={pagerRef}
+                        style={{ flex: 1 }}
+                        initialPage={0}
+                        onPageSelected={onPageSelected}
+                    // Use scrollEnabled to allow/disable swipe if needed, enabled by default
+                    >
+                        {categories.map((cat) => (
+                            <View key={cat} style={{ flex: 1 }}>
+                                <FlatList
+                                    showsVerticalScrollIndicator={false}
+                                    data={products[cat] || []}
+                                    numColumns={2}
+                                    keyExtractor={item => item.id || item.name}
+                                    contentContainerStyle={[styles.productsGrid, { paddingBottom: 120 }]}
+                                    columnWrapperStyle={styles.productRow}
+                                    renderItem={renderProductItem}
+                                />
                             </View>
-                        </TouchableOpacity>
-                    )}
-                />
+                        ))}
+                    </PagerView>
+                )}
+
+                {/* View Order Button */}
+                {cart.length > 0 && (
+                    <TouchableOpacity
+                        style={styles.viewOrderButton}
+                        onPress={() => {
+                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                            setIsCheckoutVisible(true);
+                        }}
+                        activeOpacity={0.9}
+                    >
+                        <View style={styles.viewOrderContent}>
+                            <View style={styles.cartCountBadge}>
+                                <Text style={styles.cartCountText}>{cart.length}</Text>
+                            </View>
+                            <Text style={styles.viewOrderText}>View Order</Text>
+                            <Text style={styles.viewOrderTotal}>
+                                ${cart.reduce((sum, item) => sum + (item.price * item.quantity), 0).toFixed(2)}
+                            </Text>
+                        </View>
+                    </TouchableOpacity>
+                )}
             </SafeAreaView>
+
+            <AddProductModal
+                visible={isAddProductVisible}
+                onClose={() => setIsAddProductVisible(false)}
+            />
+            <CheckoutModal
+                visible={isCheckoutVisible}
+                onClose={() => setIsCheckoutVisible(false)}
+            />
+            <SettingsModal
+                visible={isSettingsVisible}
+                onClose={() => setIsSettingsVisible(false)}
+            />
         </View>
     );
 }
@@ -276,9 +378,9 @@ const styles = StyleSheet.create({
         width: 44,
         height: 44,
         borderRadius: 22,
-        backgroundColor: 'rgba(255, 255, 255, 0.8)',
         alignItems: 'center',
         justifyContent: 'center',
+        backgroundColor: '#ffffff',
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.1,
@@ -286,13 +388,13 @@ const styles = StyleSheet.create({
         elevation: 3,
     },
     iconButtonDark: {
-        backgroundColor: 'rgba(58, 58, 60, 0.95)',
+        backgroundColor: '#2c2c2e',
+        shadowOpacity: 0.3,
     },
     iconButtonText: {
-        fontSize: 24,
+        fontSize: 20,
         fontFamily: 'Outfit_600SemiBold',
         color: '#007AFF',
-        marginTop: -2,
     },
     themeEmoji: {
         fontSize: 20,
@@ -360,11 +462,12 @@ const styles = StyleSheet.create({
     categoriesScroll: {
         paddingHorizontal: 20,
         gap: 8,
+        paddingBottom: 16,
     },
     categoryChip: {
-        paddingHorizontal: 20,
-        paddingVertical: 10,
-        borderRadius: 20,
+        paddingHorizontal: 24,
+        paddingVertical: 14,
+        borderRadius: 24,
         backgroundColor: '#ffffff',
         marginRight: 8,
         shadowColor: '#000',
@@ -492,5 +595,45 @@ const styles = StyleSheet.create({
         fontSize: 14,
         color: '#8e8e93',
         fontWeight: '600',
+    },
+    viewOrderButton: {
+        position: 'absolute',
+        bottom: 40,
+        left: 20,
+        right: 20,
+        backgroundColor: '#007AFF',
+        borderRadius: 30,
+        padding: 28,
+        shadowColor: '#007AFF',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+        elevation: 6,
+    },
+    viewOrderContent: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+    },
+    cartCountBadge: {
+        backgroundColor: 'rgba(255, 255, 255, 0.2)',
+        paddingHorizontal: 14,
+        paddingVertical: 8,
+        borderRadius: 14,
+    },
+    cartCountText: {
+        color: '#ffffff',
+        fontSize: 18,
+        fontFamily: 'Outfit_700Bold',
+    },
+    viewOrderText: {
+        color: '#ffffff',
+        fontSize: 20,
+        fontFamily: 'Outfit_600SemiBold',
+    },
+    viewOrderTotal: {
+        color: '#ffffff',
+        fontSize: 20,
+        fontFamily: 'Outfit_700Bold',
     },
 });

@@ -1,4 +1,4 @@
-import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, StyleSheet } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, StyleSheet, Alert } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { useSales } from '../context/SalesContext';
@@ -10,25 +10,22 @@ export default function Modal() {
   const params = useLocalSearchParams();
   const { productName, category, price } = params;
   const router = useRouter();
-  const { addTransaction } = useSales();
+  const { addToCart } = useSales();
   const { colorScheme } = useTheme();
   const isDark = colorScheme === 'dark';
 
   const [quantity, setQuantity] = useState('1');
-  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card' | 'upi'>('cash');
-  const [tip, setTip] = useState('');
 
-  const handleSave = async () => {
+  const handleAddToOrder = async () => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    await addTransaction({
+
+    addToCart({
       productName: productName as string,
       category: category as string,
       price: parseFloat(price as string),
       quantity: parseInt(quantity) || 1,
-      paymentMethod,
-      tip: parseFloat(tip) || 0,
-      date: new Date().toISOString().split('T')[0],
     });
+
     router.back();
   };
 
@@ -45,11 +42,6 @@ export default function Modal() {
   const decrementQuantity = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setQuantity(q => Math.max(1, parseInt(q) - 1).toString());
-  };
-
-  const handlePaymentMethodChange = (method: 'cash' | 'card' | 'upi') => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setPaymentMethod(method);
   };
 
   return (
@@ -109,52 +101,6 @@ export default function Modal() {
             </View>
           </View>
 
-          {/* Payment Method */}
-          <View style={styles.section}>
-            <Text style={[styles.label, isDark && styles.labelDark]}>Payment Method</Text>
-            <View style={styles.paymentButtons}>
-              {(['cash', 'card', 'upi'] as const).map(method => {
-                const isSelected = paymentMethod === method;
-                return (
-                  <TouchableOpacity
-                    key={method}
-                    onPress={() => handlePaymentMethodChange(method)}
-                    style={[
-                      styles.paymentButton,
-                      isSelected && styles.paymentButtonSelected,
-                      isDark && !isSelected && styles.paymentButtonDark,
-                    ]}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={[
-                      styles.paymentButtonText,
-                      isSelected && styles.paymentButtonTextSelected,
-                      isDark && !isSelected && styles.paymentButtonTextDark,
-                    ]}>
-                      {method.toUpperCase()}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          </View>
-
-          {/* Tip */}
-          <View style={styles.section}>
-            <Text style={[styles.label, isDark && styles.labelDark]}>Tip (Optional)</Text>
-            <View style={[styles.tipInput, isDark && styles.tipInputDark]}>
-              <Text style={[styles.dollarSign, isDark && styles.dollarSignDark]}>$</Text>
-              <TextInput
-                value={tip}
-                onChangeText={setTip}
-                placeholder="0.00"
-                placeholderTextColor={isDark ? '#8e8e93' : '#c7c7cc'}
-                keyboardType="numeric"
-                style={[styles.tipTextInput, isDark && styles.tipTextInputDark]}
-              />
-            </View>
-          </View>
-
           {/* Actions */}
           <View style={styles.actions}>
             <TouchableOpacity
@@ -165,11 +111,11 @@ export default function Modal() {
               <Text style={[styles.cancelButtonText, isDark && styles.cancelButtonTextDark]}>Cancel</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              onPress={handleSave}
+              onPress={handleAddToOrder}
               style={styles.saveButton}
               activeOpacity={0.7}
             >
-              <Text style={styles.saveButtonText}>Add Sale</Text>
+              <Text style={styles.saveButtonText}>Add to Order</Text>
             </TouchableOpacity>
           </View>
         </View>

@@ -1,15 +1,15 @@
-import { View, Text, ScrollView, StyleSheet, Dimensions, TouchableOpacity, Alert, Platform } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { endOfMonth, format, isSameMonth, parseISO, startOfMonth, subDays } from 'date-fns';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Print from 'expo-print';
+import { useRouter } from 'expo-router';
+import * as Sharing from 'expo-sharing';
+import { useState } from 'react';
+import { Alert, Dimensions, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Calendar } from 'react-native-calendars';
 import { BarChart } from 'react-native-gifted-charts';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useSales } from '../../context/SalesContext';
 import { useTheme } from '../../hooks/useTheme';
-import { format, subDays, startOfMonth, endOfMonth, parseISO, isSameMonth } from 'date-fns';
-import { Calendar } from 'react-native-calendars';
-import { useState } from 'react';
-import * as Print from 'expo-print';
-import * as Sharing from 'expo-sharing';
-import { useRouter } from 'expo-router';
-import * as Haptics from 'expo-haptics';
 
 const { width } = Dimensions.get('window');
 
@@ -26,7 +26,12 @@ export default function ReportsScreen() {
         const dateStr = format(date, 'yyyy-MM-dd');
         const daySales = transactions
             .filter(t => t.date === dateStr)
-            .reduce((sum, t) => sum + (t.price * t.quantity), 0);
+            .reduce((sum, t) => {
+                if (t.items) {
+                    return sum + t.items.reduce((s, i) => s + (i.price * i.quantity), 0);
+                }
+                return sum + ((t.price || 0) * (t.quantity || 0));
+            }, 0);
 
         return {
             value: daySales,
@@ -41,18 +46,33 @@ export default function ReportsScreen() {
     });
 
     // Calculate totals
-    const totalRevenue = transactions.reduce((sum, t) => sum + (t.price * t.quantity), 0);
+    const totalRevenue = transactions.reduce((sum, t) => {
+        if (t.items) {
+            return sum + t.items.reduce((s, i) => s + (i.price * i.quantity), 0);
+        }
+        return sum + ((t.price || 0) * (t.quantity || 0));
+    }, 0);
     const totalTips = transactions.reduce((sum, t) => sum + (t.tip || 0), 0);
     const totalTransactions = transactions.length;
 
     const today = format(new Date(), 'yyyy-MM-dd');
     const todayRevenue = transactions
         .filter(t => t.date === today)
-        .reduce((sum, t) => sum + (t.price * t.quantity), 0);
+        .reduce((sum, t) => {
+            if (t.items) {
+                return sum + t.items.reduce((s, i) => s + (i.price * i.quantity), 0);
+            }
+            return sum + ((t.price || 0) * (t.quantity || 0));
+        }, 0);
 
     // Selected Date Stats
     const selectedDateTransactions = transactions.filter(t => t.date === selectedDate);
-    const selectedDateRevenue = selectedDateTransactions.reduce((sum, t) => sum + (t.price * t.quantity), 0);
+    const selectedDateRevenue = selectedDateTransactions.reduce((sum, t) => {
+        if (t.items) {
+            return sum + t.items.reduce((s, i) => s + (i.price * i.quantity), 0);
+        }
+        return sum + ((t.price || 0) * (t.quantity || 0));
+    }, 0);
     const selectedDateTips = selectedDateTransactions.reduce((sum, t) => sum + (t.tip || 0), 0);
 
     // Mark days with transactions for calendar
@@ -108,15 +128,30 @@ export default function ReportsScreen() {
                                 </tr>
                             </thead>
                             <tbody>
-                                ${selectedDateTransactions.map(t => `
-                                    <tr>
-                                        <td>${format(new Date(t.timestamp), 'HH:mm')}</td>
-                                        <td>${t.productName}</td>
-                                        <td>${t.quantity}</td>
-                                        <td>${t.paymentMethod.toUpperCase()}</td>
-                                        <td>$${(t.price * t.quantity).toFixed(2)}</td>
-                                    </tr>
-                                `).join('')}
+                                ${selectedDateTransactions.map(t => {
+                if (t.items && t.items.length > 0) {
+                    const total = t.items.reduce((s, i) => s + (i.price * i.quantity), 0);
+                    const itemsList = t.items.map(i => `${i.productName} (${i.quantity}x)`).join(', ');
+                    return `
+                                            <tr>
+                                                <td>${format(new Date(t.timestamp), 'HH:mm')}</td>
+                                                <td>${itemsList}</td>
+                                                <td>${t.items.length} items</td>
+                                                <td>${t.paymentMethod.toUpperCase()}</td>
+                                                <td>$${total.toFixed(2)}</td>
+                                            </tr>
+                                        `;
+                }
+                return `
+                                        <tr>
+                                            <td>${format(new Date(t.timestamp), 'HH:mm')}</td>
+                                            <td>${t.productName}</td>
+                                            <td>${t.quantity}</td>
+                                            <td>${t.paymentMethod.toUpperCase()}</td>
+                                            <td>$${((t.price || 0) * (t.quantity || 0)).toFixed(2)}</td>
+                                        </tr>
+                                    `;
+            }).join('')}
                                 <tr class="total-row">
                                     <td colspan="4" style="text-align: right;">Total</td>
                                     <td>$${selectedDateRevenue.toFixed(2)}</td>
@@ -128,7 +163,22 @@ export default function ReportsScreen() {
             `;
 
             const { uri } = await Print.printToFileAsync({ html });
-            await Sharing.shareAsync(uri, { UTI: '.pdf', mimeType: 'application/pdf' });
+
+            const fileName = `${selectedDate}.pdf`;
+            const targetUri = FileSystem.cacheDirectory + fileName;
+
+            try {
+                await FileSystem.deleteAsync(targetUri, { idempotent: true });
+            } catch (e) {
+                // Ignore delete error
+            }
+
+            await FileSystem.moveAsync({
+                from: uri,
+                to: targetUri
+            });
+
+            await Sharing.shareAsync(targetUri, { UTI: '.pdf', mimeType: 'application/pdf' });
         } catch (error) {
             Alert.alert('Error', 'Failed to generate PDF report');
             console.error(error);
@@ -151,7 +201,11 @@ export default function ReportsScreen() {
                     if (!dailyStats[t.date]) {
                         dailyStats[t.date] = { revenue: 0, tips: 0, count: 0 };
                     }
-                    dailyStats[t.date].revenue += t.price * t.quantity;
+                    if (t.items) {
+                        dailyStats[t.date].revenue += t.items.reduce((s, i) => s + (i.price * i.quantity), 0);
+                    } else {
+                        dailyStats[t.date].revenue += (t.price || 0) * (t.quantity || 0);
+                    }
                     dailyStats[t.date].tips += t.tip || 0;
                     dailyStats[t.date].count += 1;
                 }
@@ -211,7 +265,22 @@ export default function ReportsScreen() {
             `;
 
             const { uri } = await Print.printToFileAsync({ html });
-            await Sharing.shareAsync(uri, { UTI: '.pdf', mimeType: 'application/pdf' });
+
+            const fileName = `${format(date, 'MMMM-yyyy')}.pdf`;
+            const targetUri = FileSystem.cacheDirectory + fileName;
+
+            try {
+                await FileSystem.deleteAsync(targetUri, { idempotent: true });
+            } catch (e) {
+                // Ignore delete error
+            }
+
+            await FileSystem.moveAsync({
+                from: uri,
+                to: targetUri
+            });
+
+            await Sharing.shareAsync(targetUri, { UTI: '.pdf', mimeType: 'application/pdf' });
         } catch (error) {
             Alert.alert('Error', 'Failed to generate PDF report');
             console.error(error);
@@ -227,21 +296,11 @@ export default function ReportsScreen() {
                 >
                     <Text style={[styles.title, isDark && styles.titleDark]}>Reports</Text>
 
-                    {/* Today's Summary */}
-                    <View style={[styles.summaryCard, isDark && styles.summaryCardDark]}>
-                        <Text style={[styles.cardTitle, isDark && styles.cardTitleDark]}>Today</Text>
-                        <Text style={[styles.summaryValue, isDark && styles.summaryValueDark]}>
-                            ${todayRevenue.toFixed(2)}
-                        </Text>
-                        <Text style={[styles.summaryLabel, isDark && styles.summaryLabelDark]}>
-                            {format(new Date(), 'EEEE, MMM d')}
-                        </Text>
-                    </View>
-
                     {/* Calendar Selection */}
                     <View style={[styles.calendarCard, isDark && styles.calendarCardDark]}>
-                        <Text style={[styles.sectionTitle, isDark && styles.sectionTitleDark]}>Select Date</Text>
+
                         <Calendar
+                            key={colorScheme}
                             theme={{
                                 backgroundColor: 'transparent',
                                 calendarBackground: 'transparent',
@@ -326,9 +385,9 @@ export default function ReportsScreen() {
                             <BarChart
                                 key={totalRevenue} // Force re-render when data changes
                                 data={weekData}
-                                barWidth={28}
+                                barWidth={26}
                                 noOfSections={4}
-                                barBorderRadius={6}
+                                barBorderRadius={4}
                                 frontColor="#007AFF"
                                 yAxisThickness={0}
                                 xAxisThickness={0}
@@ -338,7 +397,7 @@ export default function ReportsScreen() {
                                     fontSize: 11,
                                 }}
                                 hideRules
-                                width={width - 60}
+                                width={width - 80}
                                 height={180}
                                 isAnimated
                                 animationDuration={800}
@@ -396,7 +455,7 @@ const styles = StyleSheet.create({
     cardTitle: {
         fontSize: 15,
         fontFamily: 'Outfit_600SemiBold',
-        color: 'rgba(255, 255, 255, 0.9)',
+        color: '#000000',
         marginBottom: 8,
         letterSpacing: -0.2,
     },

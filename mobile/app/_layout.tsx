@@ -1,51 +1,73 @@
-import '../global.css';
+import { Outfit_400Regular, Outfit_600SemiBold, Outfit_700Bold, useFonts } from '@expo-google-fonts/outfit';
 import { Stack } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
+import { ProductProvider } from '../context/ProductContext';
 import { SalesProvider } from '../context/SalesContext';
 import { ThemeProvider } from '../context/ThemeContext';
-import { ProductProvider } from '../context/ProductContext';
+import '../global.css';
 import { useTheme } from '../hooks/useTheme';
-import { useFonts, Outfit_400Regular, Outfit_600SemiBold, Outfit_700Bold } from '@expo-google-fonts/outfit';
-import { View, ActivityIndicator } from 'react-native';
-import { StatusBar } from 'expo-status-bar';
 
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Updates from 'expo-updates';
 import { useEffect } from 'react';
 import { Alert } from 'react-native';
+import { UpdateModal } from '../components/UpdateModal';
+import { useProducts } from '../context/ProductContext';
+import { useSales } from '../context/SalesContext';
+import { useAppUpdate } from '../hooks/useAppUpdate';
+import { useAutoBackup } from '../hooks/useAutoBackup';
+import { BackupService } from '../utils/backupService';
+import { STORAGE_KEYS } from '../utils/storage';
 
 function RootLayoutContent() {
   const { colorScheme } = useTheme();
+  const { isUpdateAvailable, isDownloading, manifest, performUpdate, cancelUpdate } = useAppUpdate();
 
-  async function onFetchUpdateAsync() {
-    try {
-      const update = await Updates.checkForUpdateAsync();
+  // Initialize Auto Backup
+  useAutoBackup();
 
-      if (update.isAvailable) {
-        Alert.alert(
-          'Update Available',
-          'A new version of the app is available. Would you like to update now?',
-          [
-            { text: 'Later', style: 'cancel' },
-            {
-              text: 'Update',
-              onPress: async () => {
-                await Updates.fetchUpdateAsync();
-                await Updates.reloadAsync();
-              },
-            },
-          ]
-        );
-      }
-    } catch (error) {
-      // You can also add an alert() to see the error message in case of an error when fetching updates.
-      console.log(`Error fetching latest Expo update: ${error}`);
-    }
-  }
+  const { products: currentProducts } = useProducts();
+  const { transactions: currentTransactions } = useSales();
 
   useEffect(() => {
-    if (!__DEV__) {
-      onFetchUpdateAsync();
-    }
-  }, []);
+    const checkRestore = async () => {
+      // Only check if we have NO data
+      const hasProducts = Object.keys(currentProducts).length > 0;
+      const hasTransactions = currentTransactions.length > 0;
+
+      if (!hasProducts && !hasTransactions) {
+        const hasBackup = await BackupService.checkForBackup();
+        if (hasBackup) {
+          Alert.alert(
+            'Backup Found',
+            'We found a backup of your data. Would you like to restore it?',
+            [
+              { text: 'No, Start Fresh', style: 'cancel' },
+              {
+                text: 'Restore Data',
+                onPress: async () => {
+                  const backup = await BackupService.restoreBackup();
+                  if (backup) {
+                    try {
+                      await AsyncStorage.setItem('@parttime_products', JSON.stringify(backup.products));
+                      await AsyncStorage.setItem(STORAGE_KEYS.TRANSACTIONS, JSON.stringify(backup.transactions));
+                      await Updates.reloadAsync();
+                    } catch (e) {
+                      Alert.alert('Error', 'Failed to restore backup');
+                    }
+                  }
+                }
+              }
+            ]
+          );
+        }
+      }
+    };
+
+    // Slight delay to ensure contexts are loaded
+    const timer = setTimeout(checkRestore, 1000);
+    return () => clearTimeout(timer);
+  }, []); // Run once on mount
 
   return (
     <>
@@ -56,9 +78,27 @@ function RootLayoutContent() {
         <Stack.Screen name="onboarding" options={{ animation: 'fade', gestureEnabled: false }} />
         <Stack.Screen name="modal" options={{ presentation: 'transparentModal', animation: 'fade' }} />
       </Stack>
+
+      <UpdateModal
+        visible={isUpdateAvailable}
+        onUpdate={performUpdate}
+        onCancel={cancelUpdate}
+        isDownloading={isDownloading}
+        manifest={manifest}
+      />
     </>
   );
 }
+
+import * as SplashScreen from 'expo-splash-screen';
+import { useState } from 'react';
+import { View } from 'react-native';
+import { CustomSplashScreen } from '../components/CustomSplashScreen';
+
+// ... (keep imports)
+
+// Prevent the splash screen from auto-hiding before asset loading is complete.
+SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
   const [fontsLoaded] = useFonts({
@@ -66,22 +106,38 @@ export default function RootLayout() {
     Outfit_600SemiBold,
     Outfit_700Bold,
   });
+  const [isSplashAnimationFinished, setIsSplashAnimationFinished] = useState(false);
 
-  if (!fontsLoaded) {
-    return (
-      <View className="flex-1 items-center justify-center bg-gray-50 dark:bg-gray-900">
-        <ActivityIndicator size="large" color="#667eea" />
-      </View>
-    );
+  useEffect(() => {
+    // We defer SplashScreen.hideAsync() to the CustomSplashScreen component
+    // to ensure the animation starts exactly when the native splash hides.
+  }, [fontsLoaded]);
+
+  if (!fontsLoaded && !isSplashAnimationFinished) {
+    // While fonts are loading, we ensure the native splash is kept (via preventAutoHideAsync).
+    // We can also render the CustomSplashScreen here to be ready.
   }
 
   return (
-    <ThemeProvider>
-      <ProductProvider>
-        <SalesProvider>
-          <RootLayoutContent />
-        </SalesProvider>
-      </ProductProvider>
-    </ThemeProvider>
+    <View style={{ flex: 1, backgroundColor: '#121212' }}>
+      <ThemeProvider>
+        <ProductProvider>
+          <SalesProvider>
+            {/* 
+              Render the app content only when fonts are loaded to avoid layout shifts/errors.
+              It stays rendered behind the splash screen while the splash fades out.
+            */}
+            {fontsLoaded && <RootLayoutContent />}
+
+            {!isSplashAnimationFinished && (
+              <CustomSplashScreen
+                isReady={fontsLoaded}
+                onFinish={() => setIsSplashAnimationFinished(true)}
+              />
+            )}
+          </SalesProvider>
+        </ProductProvider>
+      </ThemeProvider>
+    </View>
   );
 }
