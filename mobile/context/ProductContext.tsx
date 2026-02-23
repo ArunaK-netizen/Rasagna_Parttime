@@ -1,6 +1,8 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { addDoc, collection, deleteDoc, doc, onSnapshot, query, updateDoc, where } from '@react-native-firebase/firestore';
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { PRODUCTS as INITIAL_PRODUCTS } from '../constants/Products';
+import { db } from '../firebase';
+import { useAuth } from './AuthContext';
 
 export type Product = {
     id: string;
@@ -14,106 +16,98 @@ type ProductContextType = {
     categories: string[];
     addProduct: (product: Omit<Product, 'id'>) => Promise<void>;
     deleteProduct: (productId: string, category: string) => Promise<void>;
+    updateProduct: (product: Product, oldCategory: string) => Promise<void>;
     loading: boolean;
 };
 
 const ProductContext = createContext<ProductContextType | undefined>(undefined);
 
-const STORAGE_KEY = '@parttime_products';
-
 export const ProductProvider = ({ children }: { children: React.ReactNode }) => {
-    // Transform initial products to match Product type
-    const transformedInitialProducts: Record<string, Product[]> = Object.entries(INITIAL_PRODUCTS).reduce((acc, [category, items]) => {
-        acc[category] = items.map((item, index) => ({
-            ...item,
-            id: `${category}-${index}`,
-            category: category
-        }));
-        return acc;
-    }, {} as Record<string, Product[]>);
-
-    const [products, setProducts] = useState<Record<string, Product[]>>(transformedInitialProducts);
+    const { user } = useAuth();
+    const [products, setProducts] = useState<Record<string, Product[]>>({});
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        loadProducts();
-    }, []);
-
-    const loadProducts = async () => {
-        try {
-            const stored = await AsyncStorage.getItem(STORAGE_KEY);
-            if (stored) {
-                const parsed = JSON.parse(stored) as Record<string, Product[]>;
-
-                // Migrate stored prices to match current `INITIAL_PRODUCTS` list by name/category.
-                const migrated: Record<string, Product[]> = {};
-
-                Object.entries(parsed).forEach(([category, items]) => {
-                    // Find the initial products for this category (if any)
-                    const initialForCategory = (INITIAL_PRODUCTS as Record<string, { name: string; price: number }[]>)[category];
-
-                    migrated[category] = items.map(item => {
-                        if (initialForCategory) {
-                            const match = initialForCategory.find(p => p.name === item.name);
-                            if (match) {
-                                // Keep id and other fields, but update price to the current initial value
-                                return { ...item, price: match.price };
-                            }
-                        }
-                        return item;
-                    });
-                });
-
-                setProducts(migrated);
-                // Persist migrated data so subsequent runs use the corrected prices
-                await saveProducts(migrated);
-            }
-        } catch (e) {
-            console.error('Failed to load products', e);
-        } finally {
+        if (user) {
+            loadProducts();
+        } else {
+            setProducts({});
             setLoading(false);
         }
+    }, [user]);
+
+    const loadProducts = () => {
+        if (!user) return;
+
+        const q = query(
+            collection(db, 'products'),
+            where('userId', '==', user.uid)
+        );
+
+        const unsubscribe = onSnapshot(q, (querySnapshot) => {
+            const productsData: Record<string, Product[]> = {};
+            querySnapshot.forEach((doc) => {
+                const product = { id: doc.id, ...doc.data() } as Product;
+                if (!productsData[product.category]) {
+                    productsData[product.category] = [];
+                }
+                productsData[product.category].push(product);
+            });
+
+            // If no products, initialize with default products
+            if (Object.keys(productsData).length === 0) {
+                initializeDefaultProducts();
+            } else {
+                setProducts(productsData);
+                setLoading(false);
+            }
+        });
+
+        return unsubscribe;
     };
 
-    const saveProducts = async (newProducts: Record<string, Product[]>) => {
-        try {
-            await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(newProducts));
-        } catch (e) {
-            console.error('Failed to save products', e);
+    const initializeDefaultProducts = async () => {
+        if (!user) return;
+
+        const defaultProducts: Omit<Product, 'id'>[] = [];
+        Object.entries(INITIAL_PRODUCTS).forEach(([category, items]) => {
+            items.forEach((item) => {
+                defaultProducts.push({
+                    ...item,
+                    category,
+                    userId: user.uid,
+                });
+            });
+        });
+
+        const batch = [];
+        for (const product of defaultProducts) {
+            batch.push(addDoc(collection(db, 'products'), product));
         }
+
+        await Promise.all(batch);
+        // The onSnapshot will update the state
     };
 
     const addProduct = async (product: Omit<Product, 'id'>) => {
-        const newProduct = { ...product, id: Date.now().toString() };
-        const category = product.category;
+        if (!user) return;
 
-        const updatedProducts = { ...products };
-        if (!updatedProducts[category]) {
-            updatedProducts[category] = [];
-        }
-
-        updatedProducts[category] = [...updatedProducts[category], newProduct];
-
-        setProducts(updatedProducts);
-        await saveProducts(updatedProducts);
+        await addDoc(collection(db, 'products'), { ...product, userId: user.uid });
     };
 
     const deleteProduct = async (productId: string, category: string) => {
-        const updatedProducts = { ...products };
-        if (updatedProducts[category]) {
-            updatedProducts[category] = updatedProducts[category].filter(p => p.id !== productId);
-            if (updatedProducts[category].length === 0) {
-                delete updatedProducts[category];
-            }
-            setProducts(updatedProducts);
-            await saveProducts(updatedProducts);
-        }
+        await deleteDoc(doc(db, 'products', productId));
+    };
+
+    const updateProduct = async (updatedProduct: Product, oldCategory: string) => {
+        const { id, ...data } = updatedProduct;
+        await updateDoc(doc(db, 'products', id), { ...data, userId: user.uid });
     };
 
     const categories = Object.keys(products);
 
     return (
-        <ProductContext.Provider value={{ products, categories, addProduct, deleteProduct, loading }}>
+        <ProductContext.Provider value={{ products, categories, addProduct, deleteProduct, updateProduct, loading }}>
             {children}
         </ProductContext.Provider>
     );

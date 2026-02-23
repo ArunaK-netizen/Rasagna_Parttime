@@ -1,11 +1,13 @@
-import { useEffect, useState } from 'react';
 import { Redirect } from 'expo-router';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, View } from 'react-native';
+import { useAuth } from '../context/AuthContext';
 import { loadData, STORAGE_KEYS } from '../utils/storage';
-import { View, ActivityIndicator } from 'react-native';
 
 export default function Index() {
     const [isReady, setIsReady] = useState(false);
     const [showOnboarding, setShowOnboarding] = useState(false);
+    const { user, loading: authLoading } = useAuth();
 
     useEffect(() => {
         checkOnboarding();
@@ -17,12 +19,16 @@ export default function Index() {
         setIsReady(true);
     };
 
-    if (!isReady) {
+    if (authLoading || !isReady) {
         return (
             <View className="flex-1 items-center justify-center bg-gray-50 dark:bg-gray-900">
                 <ActivityIndicator size="large" color="#667eea" />
             </View>
         );
+    }
+
+    if (!user) {
+        return <Redirect href="/login" />;
     }
 
     if (showOnboarding) {

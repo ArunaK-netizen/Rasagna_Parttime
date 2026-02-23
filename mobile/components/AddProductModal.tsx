@@ -2,8 +2,9 @@ import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
 import { useState } from 'react';
 import { KeyboardAvoidingView, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { useProducts } from '../context/ProductContext';
+import { Product, useProducts } from '../context/ProductContext';
 import { useTheme } from '../hooks/useTheme';
+import { CustomAlert } from './CustomAlert';
 
 interface AddProductModalProps {
     visible: boolean;
@@ -11,7 +12,7 @@ interface AddProductModalProps {
 }
 
 export default function AddProductModal({ visible, onClose }: AddProductModalProps) {
-    const { addProduct, categories } = useProducts();
+    const { addProduct, updateProduct, categories, products } = useProducts();
     const { colorScheme } = useTheme();
     const isDark = colorScheme === 'dark';
 
@@ -27,28 +28,90 @@ export default function AddProductModal({ visible, onClose }: AddProductModalPro
     // but with Modal visible prop, it stays mounted.
     // Let's add a reset function.
 
+    const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+
+    // Custom Alert State
+    const [alertConfig, setAlertConfig] = useState<{
+        visible: boolean;
+        title: string;
+        message: string;
+        buttons: any[];
+    }>({
+        visible: false,
+        title: '',
+        message: '',
+        buttons: [],
+    });
+
     const resetForm = () => {
         setName('');
         setPrice('');
         setCategory(categories[0] || 'snacks');
         setNewCategory('');
         setIsNewCategory(false);
+        setEditingProduct(null);
     };
 
     const handleSave = async () => {
         if (!name.trim() || !price.trim()) return;
 
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-
         const finalCategory = isNewCategory ? newCategory.trim().toLowerCase() : category;
+        const normalizedName = name.trim();
 
         if (!finalCategory) return;
 
-        await addProduct({
-            name: name.trim(),
-            price: parseFloat(price),
-            category: finalCategory,
-        });
+        // Check for duplicate product if not already editing this specific product
+        if (!editingProduct) {
+            const existingProduct = Object.values(products).flat().find(
+                p => p.name.toLowerCase() === normalizedName.toLowerCase()
+            );
+
+            if (existingProduct) {
+                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+                setAlertConfig({
+                    visible: true,
+                    title: 'Product Already Exists',
+                    message: `"${existingProduct.name}" already exists in ${existingProduct.category}. Do you want to edit it instead?`,
+                    buttons: [
+                        {
+                            text: 'Cancel',
+                            style: 'cancel',
+                            onPress: () => setAlertConfig(prev => ({ ...prev, visible: false }))
+                        },
+                        {
+                            text: 'Edit Product',
+                            style: 'default',
+                            onPress: () => {
+                                setAlertConfig(prev => ({ ...prev, visible: false }));
+                                setEditingProduct(existingProduct);
+                                setName(existingProduct.name);
+                                setPrice(existingProduct.price.toString());
+                                setCategory(existingProduct.category);
+                                setIsNewCategory(false);
+                            }
+                        }
+                    ]
+                });
+                return;
+            }
+        }
+
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
+        if (editingProduct) {
+            await updateProduct({
+                id: editingProduct.id,
+                name: normalizedName,
+                price: parseFloat(price),
+                category: finalCategory,
+            }, editingProduct.category);
+        } else {
+            await addProduct({
+                name: normalizedName,
+                price: parseFloat(price),
+                category: finalCategory,
+            });
+        }
 
         resetForm();
         onClose();
@@ -88,7 +151,7 @@ export default function AddProductModal({ visible, onClose }: AddProductModalPro
                         {/* Header */}
                         <View style={styles.header}>
                             <Text style={[styles.title, isDark && styles.titleDark]}>
-                                Add New Product
+                                {editingProduct ? 'Edit Product' : 'Add New Product'}
                             </Text>
                         </View>
 
@@ -100,7 +163,13 @@ export default function AddProductModal({ visible, onClose }: AddProductModalPro
                                 onChangeText={setName}
                                 placeholder="e.g. Diet Coke"
                                 placeholderTextColor={isDark ? '#8e8e93' : '#c7c7cc'}
-                                style={[styles.input, isDark && styles.inputDark]}
+                                style={[
+                                    styles.input,
+                                    isDark && styles.inputDark,
+                                    editingProduct && styles.inputDisabled,
+                                    editingProduct && isDark && styles.inputDisabledDark
+                                ]}
+                                editable={!editingProduct}
                             />
                         </View>
 
@@ -175,12 +244,22 @@ export default function AddProductModal({ visible, onClose }: AddProductModalPro
                                 style={[styles.saveButton, (!name || !price) && styles.saveButtonDisabled]}
                                 disabled={!name || !price}
                             >
-                                <Text style={styles.saveButtonText}>Add Product</Text>
+                                <Text style={styles.saveButtonText}>
+                                    {editingProduct ? 'Update Product' : 'Add Product'}
+                                </Text>
                             </TouchableOpacity>
                         </View>
                     </View>
                 </KeyboardAvoidingView>
             </View>
+
+            <CustomAlert
+                visible={alertConfig.visible}
+                title={alertConfig.title}
+                message={alertConfig.message}
+                buttons={alertConfig.buttons}
+                onDismiss={() => setAlertConfig(prev => ({ ...prev, visible: false }))}
+            />
         </Modal>
     );
 }
@@ -258,6 +337,13 @@ const styles = StyleSheet.create({
     inputDark: {
         backgroundColor: '#2c2c2e',
         color: '#ffffff',
+    },
+    inputDisabled: {
+        opacity: 0.6,
+        backgroundColor: '#e5e5ea',
+    },
+    inputDisabledDark: {
+        backgroundColor: '#3a3a3c',
     },
     categoryHeader: {
         flexDirection: 'row',
