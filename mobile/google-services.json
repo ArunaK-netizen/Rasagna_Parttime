@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "1013804877154",
+    "project_id": "rasagnaparttime",
+    "storage_bucket": "rasagnaparttime.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1013804877154:android:f0690e3e102e924091183b",
+        "android_client_info": {
+          "package_name": "com.blackdevil007.parttime"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "1013804877154-b1qmh4hc2e8kfpnsrqcma0dsj2g44c3n.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB_O7RUFnaYx_n3eJuQaTiMDdYHx99WDR4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "1013804877154-b1qmh4hc2e8kfpnsrqcma0dsj2g44c3n.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
