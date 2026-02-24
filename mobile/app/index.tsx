@@ -1,39 +1,32 @@
 import { Redirect } from 'expo-router';
-import { useEffect, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import { useAuth } from '../context/AuthContext';
-import { loadData, STORAGE_KEYS } from '../utils/storage';
+import { useTheme } from '../hooks/useTheme';
 
 export default function Index() {
-    const [isReady, setIsReady] = useState(false);
-    const [showOnboarding, setShowOnboarding] = useState(false);
-    const { user, loading: authLoading } = useAuth();
+  const { user, loading } = useAuth();
+  const { colorScheme } = useTheme();
+  const isDark = colorScheme === 'dark';
 
-    useEffect(() => {
-        checkOnboarding();
-    }, []);
+  if (loading) {
+    return (
+      <View
+        style={{
+          flex: 1,
+          justifyContent: 'center',
+          alignItems: 'center',
+          backgroundColor: isDark ? '#000' : '#fff',
+        }}
+      >
+        <ActivityIndicator size="large" color={isDark ? '#0A84FF' : '#007AFF'} />
+      </View>
+    );
+  }
 
-    const checkOnboarding = async () => {
-        const completed = await loadData(STORAGE_KEYS.ONBOARDING_COMPLETED);
-        setShowOnboarding(!completed);
-        setIsReady(true);
-    };
+  if (!user) {
+    return <Redirect href="/login" />;
+  }
 
-    if (authLoading || !isReady) {
-        return (
-            <View className="flex-1 items-center justify-center bg-gray-50 dark:bg-gray-900">
-                <ActivityIndicator size="large" color="#667eea" />
-            </View>
-        );
-    }
-
-    if (!user) {
-        return <Redirect href="/login" />;
-    }
-
-    if (showOnboarding) {
-        return <Redirect href="/onboarding" />;
-    }
-
-    return <Redirect href="/(tabs)/dashboard" />;
+  // Already authenticated: go straight to dashboard
+  return <Redirect href="/(tabs)/dashboard" />;
 }

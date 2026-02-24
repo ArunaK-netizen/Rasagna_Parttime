@@ -41,7 +41,9 @@ export function CustomSplashScreen({ onFinish, isReady }: CustomSplashScreenProp
 
     useEffect(() => {
         if (isReady) {
-            SplashScreen.hideAsync(); // Hide native splash to show our custom animation
+            SplashScreen.hideAsync().catch(() => {
+                // Ignore if already hidden / not available in this environment.
+            }); // Hide native splash to show our custom animation
 
             // Sequence:
             // 0 -> 1: Circle draws (0-30%)

@@ -1,6 +1,6 @@
-import { addDoc, collection, deleteDoc, doc, onSnapshot, query, updateDoc, where } from '@react-native-firebase/firestore';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { collection, onSnapshot, query, where } from '@react-native-firebase/firestore';
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { PRODUCTS as INITIAL_PRODUCTS } from '../constants/Products';
 import { db } from '../firebase';
 import { useAuth } from './AuthContext';
 
@@ -14,11 +14,9 @@ export type Product = {
 type ProductContextType = {
     products: Record<string, Product[]>;
     categories: string[];
-    addProduct: (product: Omit<Product, 'id'>) => Promise<void>;
-    deleteProduct: (productId: string, category: string) => Promise<void>;
-    updateProduct: (product: Product, oldCategory: string) => Promise<void>;
     loading: boolean;
 };
+
 
 const ProductContext = createContext<ProductContextType | undefined>(undefined);
 
@@ -27,24 +25,60 @@ export const ProductProvider = ({ children }: { children: React.ReactNode }) => 
     const [products, setProducts] = useState<Record<string, Product[]>>({});
     const [loading, setLoading] = useState(true);
 
+    // Key for AsyncStorage (per user to avoid leaking old cache)
+    const PRODUCTS_CACHE_KEY = user ? `products_cache_${user.uid}` : 'products_cache';
+
     useEffect(() => {
+        let unsubscribe: (() => void) | undefined;
+
         if (user) {
-            loadProducts();
+            loadProductsWithCache().then((unsub) => {
+                unsubscribe = unsub;
+            });
         } else {
             setProducts({});
             setLoading(false);
         }
+
+        return () => {
+            if (unsubscribe) {
+                unsubscribe();
+            }
+        };
     }, [user]);
 
-    const loadProducts = () => {
-        if (!user) return;
+    // Load from cache first, then Firestore
+    const loadProductsWithCache = async () => {
+        if (!user) {
+            setProducts({});
+            setLoading(false);
+            return;
+        }
 
+        setLoading(true);
+        // Try to load from cache (per-user)
+        try {
+            const cached = await AsyncStorage.getItem(PRODUCTS_CACHE_KEY);
+            if (cached) {
+                setProducts(JSON.parse(cached));
+                setLoading(false);
+            }
+        } catch (e) {
+            // Ignore cache errors
+        }
+        // Always listen to Firestore for updates
+        return loadProductsFromFirestore();
+    };
+
+    const loadProductsFromFirestore = () => {
+        if (!user) return () => {};
+
+        // Scope products to the current user for scalability
         const q = query(
             collection(db, 'products'),
-            where('userId', '==', user.uid)
+            where('userId', '==', user.uid),
         );
-
-        const unsubscribe = onSnapshot(q, (querySnapshot) => {
+        const unsubscribe = onSnapshot(q, async (querySnapshot) => {
             const productsData: Record<string, Product[]> = {};
             querySnapshot.forEach((doc) => {
                 const product = { id: doc.id, ...doc.data() } as Product;
@@ -53,61 +87,22 @@ export const ProductProvider = ({ children }: { children: React.ReactNode }) => 
                 }
                 productsData[product.category].push(product);
             });
-
-            // If no products, initialize with default products
-            if (Object.keys(productsData).length === 0) {
-                initializeDefaultProducts();
-            } else {
-                setProducts(productsData);
-                setLoading(false);
-            }
+            setProducts(productsData);
+            // Update cache
+            try {
+                await AsyncStorage.setItem(PRODUCTS_CACHE_KEY, JSON.stringify(productsData));
+            } catch (e) {}
+            setLoading(false);
         });
-
         return unsubscribe;
     };
 
-    const initializeDefaultProducts = async () => {
-        if (!user) return;
 
-        const defaultProducts: Omit<Product, 'id'>[] = [];
-        Object.entries(INITIAL_PRODUCTS).forEach(([category, items]) => {
-            items.forEach((item) => {
-                defaultProducts.push({
-                    ...item,
-                    category,
-                    userId: user.uid,
-                });
-            });
-        });
-
-        const batch = [];
-        for (const product of defaultProducts) {
-            batch.push(addDoc(collection(db, 'products'), product));
-        }
-
-        await Promise.all(batch);
-        // The onSnapshot will update the state
-    };
-
-    const addProduct = async (product: Omit<Product, 'id'>) => {
-        if (!user) return;
-
-        await addDoc(collection(db, 'products'), { ...product, userId: user.uid });
-    };
-
-    const deleteProduct = async (productId: string, category: string) => {
-        await deleteDoc(doc(db, 'products', productId));
-    };
-
-    const updateProduct = async (updatedProduct: Product, oldCategory: string) => {
-        const { id, ...data } = updatedProduct;
-        await updateDoc(doc(db, 'products', id), { ...data, userId: user.uid });
-    };
 
     const categories = Object.keys(products);
 
     return (
-        <ProductContext.Provider value={{ products, categories, addProduct, deleteProduct, updateProduct, loading }}>
+        <ProductContext.Provider value={{ products, categories, loading }}>
             {children}
         </ProductContext.Provider>
     );

@@ -1,6 +1,5 @@
-import { doc, onSnapshot, setDoc } from '@react-native-firebase/firestore';
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { db } from '../firebase';
+import { STORAGE_KEYS, loadData, saveData } from '../utils/storage';
 import { useAuth } from './AuthContext';
 
 type Theme = 'light' | 'dark';
@@ -19,42 +18,25 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
-        if (user) {
-            loadTheme();
-        } else {
-            setColorScheme('light');
-            setIsLoading(false);
-        }
+        (async () => {
+            setIsLoading(true);
+            await loadThemeFromStorage();
+        })();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [user]);
 
-    const loadTheme = () => {
-        if (!user) return;
-
-        const themeDoc = doc(db, 'userPreferences', user.uid);
-        const unsubscribe = onSnapshot(themeDoc, (doc) => {
-            if (doc.exists) {
-                const data = doc.data();
-                setColorScheme(data.theme || 'light');
-            } else {
-                setColorScheme('light');
-            }
-            setIsLoading(false);
-        });
-
-        return unsubscribe;
+    // Only use AsyncStorage for theme
+    const loadThemeFromStorage = async () => {
+        const storedTheme = await loadData(STORAGE_KEYS.THEME);
+        setColorScheme(storedTheme === 'dark' ? 'dark' : 'light');
+        setIsLoading(false);
     };
 
+    // Toggle theme and persist to AsyncStorage only
     const toggleColorScheme = async () => {
-        if (!user) return;
-
         const newScheme = colorScheme === 'dark' ? 'light' : 'dark';
         setColorScheme(newScheme);
-
-        try {
-            await setDoc(doc(db, 'userPreferences', user.uid), { theme: newScheme }, { merge: true });
-        } catch (error) {
-            console.error('Failed to save theme:', error);
-        }
+        await saveData(STORAGE_KEYS.THEME, newScheme);
     };
 
     return (

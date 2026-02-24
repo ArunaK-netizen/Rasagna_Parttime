@@ -3,67 +3,63 @@ import { format } from 'date-fns';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import { useMemo, useRef, useState } from 'react';
-import { FlatList, Keyboard, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { useMemo, useState } from 'react';
+import { FlatList, Keyboard, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import AddProductModal from '../../components/AddProductModal';
 import CheckoutModal from '../../components/CheckoutModal';
-import SettingsModal from '../../components/SettingsModal';
 import { useProducts } from '../../context/ProductContext';
 import { useSales } from '../../context/SalesContext';
 import { useTheme } from '../../hooks/useTheme';
-// Mock PagerView for web to avoid native dependency issues during bundle
-const PagerView = Platform.OS === 'web' ? View : require('react-native-pager-view').default;
 
 export default function Dashboard() {
     const { transactions, cart } = useSales();
     const { products, categories } = useProducts();
     const [selectedCategory, setSelectedCategory] = useState(categories[0] || 'snacks');
     const [searchQuery, setSearchQuery] = useState('');
-    const [isAddProductVisible, setIsAddProductVisible] = useState(false);
     const [isCheckoutVisible, setIsCheckoutVisible] = useState(false);
-    const [isSettingsVisible, setIsSettingsVisible] = useState(false);
     const router = useRouter();
     const { colorScheme, toggleColorScheme } = useTheme();
     const isDark = colorScheme === 'dark';
 
     const today = format(new Date(), 'yyyy-MM-dd');
-    const todaysTransactions = transactions.filter(t => t.date === today);
+    const todaysTransactions = useMemo(
+        () => transactions.filter(t => t.date === today),
+        [transactions, today],
+    );
 
-    const totalCash = todaysTransactions
-        .filter(t => t.paymentMethod === 'cash')
-        .reduce((sum, t) => {
-            if (t.items) {
-                return sum + t.items.reduce((s, i) => s + (i.price * i.quantity), 0);
+    const { totalCash, totalCard, totalTips, totalSales } = useMemo(() => {
+        let cash = 0;
+        let card = 0;
+        let tips = 0;
+
+        for (const t of todaysTransactions) {
+            const baseAmount = t.items
+                ? t.items.reduce((s, i) => s + (i.price * i.quantity), 0)
+                : ((t.price || 0) * (t.quantity || 0));
+
+            if (t.paymentMethod === 'cash') {
+                cash += baseAmount;
+            } else if (t.paymentMethod === 'card' || t.paymentMethod === 'upi') {
+                card += baseAmount;
             }
-            return sum + ((t.price || 0) * (t.quantity || 0));
-        }, 0);
 
-    const totalCard = todaysTransactions
-        .filter(t => t.paymentMethod === 'card' || t.paymentMethod === 'upi')
-        .reduce((sum, t) => {
-            if (t.items) {
-                return sum + t.items.reduce((s, i) => s + (i.price * i.quantity), 0);
-            }
-            return sum + ((t.price || 0) * (t.quantity || 0));
-        }, 0);
+            tips += t.tip || 0;
+        }
 
-    const totalTips = todaysTransactions.reduce((sum, t) => sum + (t.tip || 0), 0);
-    const totalSales = totalCash + totalCard;
+        return {
+            totalCash: cash,
+            totalCard: card,
+            totalTips: tips,
+            totalSales: cash + card,
+        };
+    }, [todaysTransactions]);
 
-    const pagerRef = useRef<any>(null);
-
-    // Sync pager when category is selected via tap
+    // Handle category changes
     const handleCategoryPress = (cat: string) => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         setSelectedCategory(cat);
         setSearchQuery('');
         Keyboard.dismiss();
-
-        const index = categories.indexOf(cat);
-        if (index !== -1) {
-            pagerRef.current?.setPage(index);
-        }
     };
 
     const handleProductPress = (item: any) => {
@@ -105,9 +101,10 @@ export default function Dashboard() {
     // Filter products based on search query
     const searchResults = useMemo(() => {
         if (!searchQuery.trim()) return [];
-        return Object.values(products).flat().filter(p =>
-            p.name.toLowerCase().includes(searchQuery.toLowerCase())
-        );
+        const q = searchQuery.toLowerCase();
+        return Object.values(products)
+            .flat()
+            .filter(p => p.name.toLowerCase().includes(q));
     }, [searchQuery, products]);
 
     return (
@@ -131,15 +128,6 @@ export default function Dashboard() {
                         <TouchableOpacity
                             onPress={() => {
                                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                                setIsAddProductVisible(true);
-                            }}
-                            style={[styles.iconButton, isDark && styles.iconButtonDark]}
-                        >
-                            <Ionicons name="add" size={24} color={isDark ? "#0A84FF" : "#007AFF"} />
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                            onPress={() => {
-                                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                                 toggleColorScheme();
                             }}
                             style={[styles.iconButton, isDark && styles.iconButtonDark]}
@@ -153,11 +141,11 @@ export default function Dashboard() {
                         <TouchableOpacity
                             onPress={() => {
                                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                                setIsSettingsVisible(true);
+                                router.push('/profile');
                             }}
                             style={[styles.iconButton, isDark && styles.iconButtonDark]}
                         >
-                            <Ionicons name="server-outline" size={22} color={isDark ? "#0A84FF" : "#007AFF"} />
+                            <Ionicons name="person-circle-outline" size={26} color={isDark ? "#0A84FF" : "#007AFF"} />
                         </TouchableOpacity>
                     </View>
                 </View>
@@ -249,40 +237,16 @@ export default function Dashboard() {
                     </ScrollView>
                 </View>
 
-                {/* Products Grid or Pager */}
-                {searchQuery.trim().length > 0 ? (
-                    <FlatList
-                        showsVerticalScrollIndicator={false}
-                        data={searchResults}
-                        numColumns={2}
-                        keyExtractor={item => item.id || item.name}
-                        contentContainerStyle={[styles.productsGrid, { paddingBottom: 120 }]}
-                        columnWrapperStyle={styles.productRow}
-                        renderItem={renderProductItem}
-                    />
-                ) : (
-                    <PagerView
-                        ref={pagerRef}
-                        style={{ flex: 1 }}
-                        initialPage={0}
-                        onPageSelected={onPageSelected}
-                    // Use scrollEnabled to allow/disable swipe if needed, enabled by default
-                    >
-                        {categories.map((cat) => (
-                            <View key={cat} style={{ flex: 1 }}>
-                                <FlatList
-                                    showsVerticalScrollIndicator={false}
-                                    data={products[cat] || []}
-                                    numColumns={2}
-                                    keyExtractor={item => item.id || item.name}
-                                    contentContainerStyle={[styles.productsGrid, { paddingBottom: 120 }]}
-                                    columnWrapperStyle={styles.productRow}
-                                    renderItem={renderProductItem}
-                                />
-                            </View>
-                        ))}
-                    </PagerView>
-                )}
+                {/* Products Grid */}
+                <FlatList
+                    showsVerticalScrollIndicator={false}
+                    data={searchQuery.trim().length > 0 ? searchResults : (products[selectedCategory] || [])}
+                    numColumns={2}
+                    keyExtractor={item => item.id || item.name}
+                    contentContainerStyle={[styles.productsGrid, { paddingBottom: 120 }]}
+                    columnWrapperStyle={styles.productRow}
+                    renderItem={renderProductItem}
+                />
 
                 {/* View Order Button */}
                 {cart.length > 0 && (
@@ -307,18 +271,11 @@ export default function Dashboard() {
                 )}
             </SafeAreaView>
 
-            <AddProductModal
-                visible={isAddProductVisible}
-                onClose={() => setIsAddProductVisible(false)}
-            />
             <CheckoutModal
                 visible={isCheckoutVisible}
                 onClose={() => setIsCheckoutVisible(false)}
             />
-            <SettingsModal
-                visible={isSettingsVisible}
-                onClose={() => setIsSettingsVisible(false)}
-            />
+
         </View>
     );
 }
