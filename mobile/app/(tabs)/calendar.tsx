@@ -1,5 +1,6 @@
 import { format, parseISO } from 'date-fns';
 import * as Haptics from 'expo-haptics';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -55,6 +56,10 @@ export default function CalendarScreen() {
 
     return (
         <View style={[styles.container, isDark && styles.containerDark]}>
+            <LinearGradient
+                colors={isDark ? ['#1c1c1e', '#2c2c2e'] : ['#f2f2f7', '#e5e5ea']}
+                style={styles.headerGradient}
+            />
             <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
                 <View style={styles.header}>
                     <Text style={[styles.title, isDark && styles.titleDark]}>History</Text>
@@ -177,6 +182,13 @@ const styles = StyleSheet.create({
     },
     containerDark: {
         backgroundColor: '#000000',
+    },
+    headerGradient: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        height: 280,
     },
     safeArea: {
         flex: 1,

@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { STORAGE_KEYS, loadData, saveData } from '../utils/storage';
+import { useAuth } from './AuthContext';
 
 type Theme = 'light' | 'dark';
 
@@ -11,37 +12,31 @@ interface ThemeContextType {
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
-const THEME_KEY = '@theme_preference';
-
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
+    const { user } = useAuth();
     const [colorScheme, setColorScheme] = useState<Theme>('light');
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
-        loadTheme();
-    }, []);
+        (async () => {
+            setIsLoading(true);
+            await loadThemeFromStorage();
+        })();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [user]);
 
-    const loadTheme = async () => {
-        try {
-            const savedTheme = await AsyncStorage.getItem(THEME_KEY);
-            if (savedTheme === 'dark' || savedTheme === 'light') {
-                setColorScheme(savedTheme);
-            }
-        } catch (error) {
-            console.error('Failed to load theme:', error);
-        } finally {
-            setIsLoading(false);
-        }
+    // Only use AsyncStorage for theme
+    const loadThemeFromStorage = async () => {
+        const storedTheme = await loadData(STORAGE_KEYS.THEME);
+        setColorScheme(storedTheme === 'dark' ? 'dark' : 'light');
+        setIsLoading(false);
     };
 
+    // Toggle theme and persist to AsyncStorage only
     const toggleColorScheme = async () => {
         const newScheme = colorScheme === 'dark' ? 'light' : 'dark';
         setColorScheme(newScheme);
-        try {
-            await AsyncStorage.setItem(THEME_KEY, newScheme);
-        } catch (error) {
-            console.error('Failed to save theme:', error);
-        }
+        await saveData(STORAGE_KEYS.THEME, newScheme);
     };
 
     return (

@@ -1,6 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { collection, onSnapshot, query, where } from '@react-native-firebase/firestore';
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { PRODUCTS as INITIAL_PRODUCTS } from '../constants/Products';
+import { db } from '../firebase';
+import { useAuth } from './AuthContext';
 
 export type Product = {
     id: string;
@@ -12,108 +14,95 @@ export type Product = {
 type ProductContextType = {
     products: Record<string, Product[]>;
     categories: string[];
-    addProduct: (product: Omit<Product, 'id'>) => Promise<void>;
-    deleteProduct: (productId: string, category: string) => Promise<void>;
     loading: boolean;
 };
 
+
 const ProductContext = createContext<ProductContextType | undefined>(undefined);
 
-const STORAGE_KEY = '@parttime_products';
-
 export const ProductProvider = ({ children }: { children: React.ReactNode }) => {
-    // Transform initial products to match Product type
-    const transformedInitialProducts: Record<string, Product[]> = Object.entries(INITIAL_PRODUCTS).reduce((acc, [category, items]) => {
-        acc[category] = items.map((item, index) => ({
-            ...item,
-            id: `${category}-${index}`,
-            category: category
-        }));
-        return acc;
-    }, {} as Record<string, Product[]>);
-
-    const [products, setProducts] = useState<Record<string, Product[]>>(transformedInitialProducts);
+    const { user } = useAuth();
+    const [products, setProducts] = useState<Record<string, Product[]>>({});
     const [loading, setLoading] = useState(true);
 
+    // Key for AsyncStorage (per user to avoid leaking old cache)
+    const PRODUCTS_CACHE_KEY = user ? `products_cache_${user.uid}` : 'products_cache';
+
     useEffect(() => {
-        loadProducts();
-    }, []);
+        let unsubscribe: (() => void) | undefined;
 
-    const loadProducts = async () => {
-        try {
-            const stored = await AsyncStorage.getItem(STORAGE_KEY);
-            if (stored) {
-                const parsed = JSON.parse(stored) as Record<string, Product[]>;
-
-                // Migrate stored prices to match current `INITIAL_PRODUCTS` list by name/category.
-                const migrated: Record<string, Product[]> = {};
-
-                Object.entries(parsed).forEach(([category, items]) => {
-                    // Find the initial products for this category (if any)
-                    const initialForCategory = (INITIAL_PRODUCTS as Record<string, { name: string; price: number }[]>)[category];
-
-                    migrated[category] = items.map(item => {
-                        if (initialForCategory) {
-                            const match = initialForCategory.find(p => p.name === item.name);
-                            if (match) {
-                                // Keep id and other fields, but update price to the current initial value
-                                return { ...item, price: match.price };
-                            }
-                        }
-                        return item;
-                    });
-                });
-
-                setProducts(migrated);
-                // Persist migrated data so subsequent runs use the corrected prices
-                await saveProducts(migrated);
-            }
-        } catch (e) {
-            console.error('Failed to load products', e);
-        } finally {
+        if (user) {
+            loadProductsWithCache().then((unsub) => {
+                unsubscribe = unsub;
+            });
+        } else {
+            setProducts({});
             setLoading(false);
         }
-    };
 
-    const saveProducts = async (newProducts: Record<string, Product[]>) => {
-        try {
-            await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(newProducts));
-        } catch (e) {
-            console.error('Failed to save products', e);
-        }
-    };
-
-    const addProduct = async (product: Omit<Product, 'id'>) => {
-        const newProduct = { ...product, id: Date.now().toString() };
-        const category = product.category;
-
-        const updatedProducts = { ...products };
-        if (!updatedProducts[category]) {
-            updatedProducts[category] = [];
-        }
-
-        updatedProducts[category] = [...updatedProducts[category], newProduct];
-
-        setProducts(updatedProducts);
-        await saveProducts(updatedProducts);
-    };
-
-    const deleteProduct = async (productId: string, category: string) => {
-        const updatedProducts = { ...products };
-        if (updatedProducts[category]) {
-            updatedProducts[category] = updatedProducts[category].filter(p => p.id !== productId);
-            if (updatedProducts[category].length === 0) {
-                delete updatedProducts[category];
+        return () => {
+            if (unsubscribe) {
+                unsubscribe();
             }
-            setProducts(updatedProducts);
-            await saveProducts(updatedProducts);
+        };
+    }, [user]);
+
+    // Load from cache first, then Firestore
+    const loadProductsWithCache = async () => {
+        if (!user) {
+            setProducts({});
+            setLoading(false);
+            return;
         }
+
+        setLoading(true);
+        // Try to load from cache (per-user)
+        try {
+            const cached = await AsyncStorage.getItem(PRODUCTS_CACHE_KEY);
+            if (cached) {
+                setProducts(JSON.parse(cached));
+                setLoading(false);
+            }
+        } catch (e) {
+            // Ignore cache errors
+        }
+        // Always listen to Firestore for updates
+        return loadProductsFromFirestore();
     };
+
+    const loadProductsFromFirestore = () => {
+        if (!user) return () => {};
+
+        // Scope products to the current user for scalability
+        const q = query(
+            collection(db, 'products'),
+            where('userId', '==', user.uid),
+        );
+        const unsubscribe = onSnapshot(q, async (querySnapshot) => {
+            const productsData: Record<string, Product[]> = {};
+            querySnapshot.forEach((doc) => {
+                const product = { id: doc.id, ...doc.data() } as Product;
+                if (!productsData[product.category]) {
+                    productsData[product.category] = [];
+                }
+                productsData[product.category].push(product);
+            });
+            setProducts(productsData);
+            // Update cache
+            try {
+                await AsyncStorage.setItem(PRODUCTS_CACHE_KEY, JSON.stringify(productsData));
+            } catch (e) {}
+            setLoading(false);
+        });
+        return unsubscribe;
+    };
+
+
 
     const categories = Object.keys(products);
 
     return (
-        <ProductContext.Provider value={{ products, categories, addProduct, deleteProduct, loading }}>
+        <ProductContext.Provider value={{ products, categories, loading }}>
             {children}
         </ProductContext.Provider>
     );

@@ -1,11 +1,11 @@
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { useRouter } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useState } from 'react';
-import { LinearGradient } from 'expo-linear-gradient';
-import { saveData, STORAGE_KEYS } from '../utils/storage';
-import Animated, { FadeInRight, FadeOutLeft } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useRouter } from 'expo-router';
+import { useState } from 'react';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import Animated, { FadeInRight, FadeOutLeft } from 'react-native-reanimated';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { saveData, STORAGE_KEYS } from '../utils/storage';
 
 const SLIDES = [
     {
@@ -35,7 +35,7 @@ export default function Onboarding() {
             setCurrentSlide(prev => prev + 1);
         } else {
             await saveData(STORAGE_KEYS.ONBOARDING_COMPLETED, true);
-            router.replace('/(tabs)/dashboard');
+            router.replace('/login');
         }
     };
 

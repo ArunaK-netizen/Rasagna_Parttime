@@ -5,6 +5,7 @@ import { Alert, KeyboardAvoidingView, Modal, Platform, ScrollView, StyleSheet, T
 import { useSales } from '../context/SalesContext';
 import { Transaction, TransactionItem } from '../hooks/useSalesData';
 import { useTheme } from '../hooks/useTheme';
+import { CustomAlert } from './CustomAlert';
 
 interface EditTransactionModalProps {
     visible: boolean;
@@ -23,6 +24,7 @@ export default function EditTransactionModal({ visible, onClose, transaction }: 
     const [items, setItems] = useState<TransactionItem[]>([]);
     const [quantity, setQuantity] = useState('1');
     const [price, setPrice] = useState('0');
+    const [deleteAlertVisible, setDeleteAlertVisible] = useState(false);
 
     // Initialize state when transaction changes
     useEffect(() => {
@@ -74,21 +76,7 @@ export default function EditTransactionModal({ visible, onClose, transaction }: 
 
     const handleDelete = () => {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-        Alert.alert(
-            "Delete Transaction",
-            "Are you sure you want to delete this transaction?",
-            [
-                { text: "Cancel", style: "cancel" },
-                {
-                    text: "Delete",
-                    style: "destructive",
-                    onPress: async () => {
-                        await deleteTransaction(transaction.id);
-                        onClose();
-                    }
-                }
-            ]
-        );
+        setDeleteAlertVisible(true);
     };
 
     const handleCancel = () => {
@@ -145,192 +133,218 @@ export default function EditTransactionModal({ visible, onClose, transaction }: 
     };
 
     return (
-        <Modal
-            animationType="fade"
-            transparent={true}
-            visible={visible}
-            onRequestClose={handleCancel}
-        >
-            <View style={styles.container}>
-                <BlurView
-                    intensity={100}
-                    tint={isDark ? 'dark' : 'light'}
-                    style={styles.blurView}
-                />
+        <>
+            <Modal
+                animationType="fade"
+                transparent={true}
+                visible={visible}
+                onRequestClose={handleCancel}
+            >
+                <View style={styles.container}>
+                    <BlurView
+                        intensity={100}
+                        tint={isDark ? 'dark' : 'light'}
+                        style={styles.blurView}
+                    />
 
-                <TouchableOpacity
-                    style={styles.backdrop}
-                    activeOpacity={1}
-                    onPress={handleCancel}
-                />
+                    <TouchableOpacity
+                        style={styles.backdrop}
+                        activeOpacity={1}
+                        onPress={handleCancel}
+                    />
 
-                <KeyboardAvoidingView
-                    behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-                    style={styles.keyboardView}
-                >
-                    <View style={[styles.modal, isDark && styles.modalDark]}>
-                        {/* Header */}
-                        <View style={styles.header}>
-                            <Text style={[styles.title, isDark && styles.titleDark]}>
-                                {isMultiItem ? 'Edit Order' : `Edit ${transaction.productName}`}
-                            </Text>
-                        </View>
+                    <KeyboardAvoidingView
+                        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                        style={styles.keyboardView}
+                    >
+                        <View style={[styles.modal, isDark && styles.modalDark]}>
+                            {/* Header */}
+                            <View style={styles.header}>
+                                <Text style={[styles.title, isDark && styles.titleDark]}>
+                                    {isMultiItem ? 'Edit Order' : `Edit ${transaction.productName}`}
+                                </Text>
+                            </View>
 
-                        <ScrollView showsVerticalScrollIndicator={false}>
-                            {isMultiItem ? (
-                                <View style={[styles.itemsList, isDark && styles.itemsListDark]}>
-                                    <Text style={[styles.sectionLabel, isDark && styles.sectionLabelDark, { marginBottom: 12 }]}>Items</Text>
-                                    {items.map((item, index) => (
-                                        <View key={index} style={[styles.itemRow, isDark && styles.itemRowDark]}>
-                                            <View style={styles.itemInfo}>
-                                                <Text style={[styles.itemName, isDark && styles.itemNameDark]}>
-                                                    {item.productName}
-                                                </Text>
-                                                <Text style={[styles.itemPrice, isDark && styles.itemPriceDark]}>
-                                                    ${item.price.toFixed(2)}
-                                                </Text>
+                            <ScrollView showsVerticalScrollIndicator={false}>
+                                {isMultiItem ? (
+                                    <View style={[styles.itemsList, isDark && styles.itemsListDark]}>
+                                        <Text style={[styles.sectionLabel, isDark && styles.sectionLabelDark, { marginBottom: 12 }]}>Items</Text>
+                                        {items.map((item, index) => (
+                                            <View key={index} style={[styles.itemRow, isDark && styles.itemRowDark]}>
+                                                <View style={styles.itemInfo}>
+                                                    <Text style={[styles.itemName, isDark && styles.itemNameDark]}>
+                                                        {item.productName}
+                                                    </Text>
+                                                    <Text style={[styles.itemPrice, isDark && styles.itemPriceDark]}>
+                                                        ${item.price.toFixed(2)}
+                                                    </Text>
+                                                </View>
+
+                                                <View style={styles.itemControls}>
+                                                    <TouchableOpacity
+                                                        onPress={() => decrementItem(index)}
+                                                        style={[styles.controlButton, isDark && styles.controlButtonDark]}
+                                                    >
+                                                        <Text style={[styles.controlButtonText, isDark && styles.controlButtonTextDark]}>−</Text>
+                                                    </TouchableOpacity>
+
+                                                    <Text style={[styles.itemQuantity, isDark && styles.itemQuantityDark]}>
+                                                        {item.quantity}
+                                                    </Text>
+
+                                                    <TouchableOpacity
+                                                        onPress={() => incrementItem(index)}
+                                                        style={[styles.controlButton, isDark && styles.controlButtonDark]}
+                                                    >
+                                                        <Text style={[styles.controlButtonText, isDark && styles.controlButtonTextDark]}>+</Text>
+                                                    </TouchableOpacity>
+
+                                                    <TouchableOpacity
+                                                        onPress={() => removeItem(index)}
+                                                        style={[styles.removeButton, isDark && styles.removeButtonDark]}
+                                                    >
+                                                        <Text style={styles.removeButtonText}>✕</Text>
+                                                    </TouchableOpacity>
+                                                </View>
                                             </View>
+                                        ))}
+                                        <View style={styles.totalRow}>
+                                            <Text style={[styles.totalLabel, isDark && styles.totalLabelDark]}>Total Items</Text>
+                                            <Text style={[styles.totalValue, isDark && styles.totalValueDark]}>
+                                                ${items.reduce((sum, i) => sum + (i.price * i.quantity), 0).toFixed(2)}
+                                            </Text>
+                                        </View>
+                                    </View>
+                                ) : (
+                                    <>
+                                        {/* Price */}
+                                        <View style={styles.section}>
+                                            <Text style={[styles.label, isDark && styles.labelDark]}>Price ($)</Text>
+                                            <TextInput
+                                                value={price}
+                                                onChangeText={setPrice}
+                                                keyboardType="numeric"
+                                                style={[styles.input, isDark && styles.inputDark]}
+                                            />
+                                        </View>
 
-                                            <View style={styles.itemControls}>
+                                        {/* Quantity */}
+                                        <View style={[styles.section, styles.quantitySection, isDark && styles.sectionDark]}>
+                                            <Text style={[styles.sectionLabel, isDark && styles.sectionLabelDark]}>Quantity</Text>
+                                            <View style={styles.quantityControls}>
                                                 <TouchableOpacity
-                                                    onPress={() => decrementItem(index)}
-                                                    style={[styles.controlButton, isDark && styles.controlButtonDark]}
+                                                    onPress={decrementQuantity}
+                                                    style={[styles.quantityButton, isDark && styles.quantityButtonDark]}
                                                 >
-                                                    <Text style={[styles.controlButtonText, isDark && styles.controlButtonTextDark]}>−</Text>
+                                                    <Text style={[styles.quantityButtonText, isDark && styles.quantityButtonTextDark]}>−</Text>
                                                 </TouchableOpacity>
-
-                                                <Text style={[styles.itemQuantity, isDark && styles.itemQuantityDark]}>
-                                                    {item.quantity}
-                                                </Text>
-
+                                                <TextInput
+                                                    value={quantity}
+                                                    onChangeText={setQuantity}
+                                                    keyboardType="numeric"
+                                                    style={[styles.quantityInput, isDark && styles.quantityInputDark]}
+                                                />
                                                 <TouchableOpacity
-                                                    onPress={() => incrementItem(index)}
-                                                    style={[styles.controlButton, isDark && styles.controlButtonDark]}
+                                                    onPress={incrementQuantity}
+                                                    style={styles.quantityButtonPrimary}
                                                 >
-                                                    <Text style={[styles.controlButtonText, isDark && styles.controlButtonTextDark]}>+</Text>
-                                                </TouchableOpacity>
-
-                                                <TouchableOpacity
-                                                    onPress={() => removeItem(index)}
-                                                    style={[styles.removeButton, isDark && styles.removeButtonDark]}
-                                                >
-                                                    <Text style={styles.removeButtonText}>✕</Text>
+                                                    <Text style={styles.quantityButtonTextPrimary}>+</Text>
                                                 </TouchableOpacity>
                                             </View>
                                         </View>
-                                    ))}
-                                    <View style={styles.totalRow}>
-                                        <Text style={[styles.totalLabel, isDark && styles.totalLabelDark]}>Total Items</Text>
-                                        <Text style={[styles.totalValue, isDark && styles.totalValueDark]}>
-                                            ${items.reduce((sum, i) => sum + (i.price * i.quantity), 0).toFixed(2)}
-                                        </Text>
+                                    </>
+                                )}
+
+                                {/* Payment Method */}
+                                <View style={styles.section}>
+                                    <Text style={[styles.label, isDark && styles.labelDark]}>Payment Method</Text>
+                                    <View style={styles.paymentButtons}>
+                                        {(['cash', 'card', 'upi'] as const).map(method => {
+                                            const isSelected = paymentMethod === method;
+                                            return (
+                                                <TouchableOpacity
+                                                    key={method}
+                                                    onPress={() => setPaymentMethod(method)}
+                                                    style={[
+                                                        styles.paymentButton,
+                                                        isSelected && styles.paymentButtonSelected,
+                                                        isDark && !isSelected && styles.paymentButtonDark,
+                                                    ]}
+                                                >
+                                                    <Text style={[
+                                                        styles.paymentButtonText,
+                                                        isSelected && styles.paymentButtonTextSelected,
+                                                        isDark && !isSelected && styles.paymentButtonTextDark,
+                                                    ]}>
+                                                        {method.toUpperCase()}
+                                                    </Text>
+                                                </TouchableOpacity>
+                                            );
+                                        })}
                                     </View>
                                 </View>
-                            ) : (
-                                <>
-                                    {/* Price */}
-                                    <View style={styles.section}>
-                                        <Text style={[styles.label, isDark && styles.labelDark]}>Price ($)</Text>
+
+                                {/* Tip */}
+                                <View style={styles.section}>
+                                    <Text style={[styles.label, isDark && styles.labelDark]}>Tip (Optional)</Text>
+                                    <View style={[styles.tipInput, isDark && styles.tipInputDark]}>
+                                        <Text style={[styles.dollarSign, isDark && styles.dollarSignDark]}>$</Text>
                                         <TextInput
-                                            value={price}
-                                            onChangeText={setPrice}
+                                            value={tip}
+                                            onChangeText={setTip}
+                                            placeholder="0.00"
+                                            placeholderTextColor={isDark ? '#8e8e93' : '#c7c7cc'}
                                             keyboardType="numeric"
-                                            style={[styles.input, isDark && styles.inputDark]}
+                                            style={[styles.tipTextInput, isDark && styles.tipTextInputDark]}
                                         />
                                     </View>
-
-                                    {/* Quantity */}
-                                    <View style={[styles.section, styles.quantitySection, isDark && styles.sectionDark]}>
-                                        <Text style={[styles.sectionLabel, isDark && styles.sectionLabelDark]}>Quantity</Text>
-                                        <View style={styles.quantityControls}>
-                                            <TouchableOpacity
-                                                onPress={decrementQuantity}
-                                                style={[styles.quantityButton, isDark && styles.quantityButtonDark]}
-                                            >
-                                                <Text style={[styles.quantityButtonText, isDark && styles.quantityButtonTextDark]}>−</Text>
-                                            </TouchableOpacity>
-                                            <TextInput
-                                                value={quantity}
-                                                onChangeText={setQuantity}
-                                                keyboardType="numeric"
-                                                style={[styles.quantityInput, isDark && styles.quantityInputDark]}
-                                            />
-                                            <TouchableOpacity
-                                                onPress={incrementQuantity}
-                                                style={styles.quantityButtonPrimary}
-                                            >
-                                                <Text style={styles.quantityButtonTextPrimary}>+</Text>
-                                            </TouchableOpacity>
-                                        </View>
-                                    </View>
-                                </>
-                            )}
-
-                            {/* Payment Method */}
-                            <View style={styles.section}>
-                                <Text style={[styles.label, isDark && styles.labelDark]}>Payment Method</Text>
-                                <View style={styles.paymentButtons}>
-                                    {(['cash', 'card', 'upi'] as const).map(method => {
-                                        const isSelected = paymentMethod === method;
-                                        return (
-                                            <TouchableOpacity
-                                                key={method}
-                                                onPress={() => setPaymentMethod(method)}
-                                                style={[
-                                                    styles.paymentButton,
-                                                    isSelected && styles.paymentButtonSelected,
-                                                    isDark && !isSelected && styles.paymentButtonDark,
-                                                ]}
-                                            >
-                                                <Text style={[
-                                                    styles.paymentButtonText,
-                                                    isSelected && styles.paymentButtonTextSelected,
-                                                    isDark && !isSelected && styles.paymentButtonTextDark,
-                                                ]}>
-                                                    {method.toUpperCase()}
-                                                </Text>
-                                            </TouchableOpacity>
-                                        );
-                                    })}
                                 </View>
-                            </View>
 
-                            {/* Tip */}
-                            <View style={styles.section}>
-                                <Text style={[styles.label, isDark && styles.labelDark]}>Tip (Optional)</Text>
-                                <View style={[styles.tipInput, isDark && styles.tipInputDark]}>
-                                    <Text style={[styles.dollarSign, isDark && styles.dollarSignDark]}>$</Text>
-                                    <TextInput
-                                        value={tip}
-                                        onChangeText={setTip}
-                                        placeholder="0.00"
-                                        placeholderTextColor={isDark ? '#8e8e93' : '#c7c7cc'}
-                                        keyboardType="numeric"
-                                        style={[styles.tipTextInput, isDark && styles.tipTextInputDark]}
-                                    />
+                                {/* Actions */}
+                                <View style={styles.actions}>
+                                    <TouchableOpacity
+                                        onPress={handleDelete}
+                                        style={[styles.deleteButton, isDark && styles.deleteButtonDark]}
+                                    >
+                                        <Text style={styles.deleteButtonText}>Delete</Text>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity
+                                        onPress={handleSave}
+                                        style={styles.saveButton}
+                                    >
+                                        <Text style={styles.saveButtonText}>Save Changes</Text>
+                                    </TouchableOpacity>
                                 </View>
-                            </View>
+                            </ScrollView>
+                        </View>
+                    </KeyboardAvoidingView>
+                </View>
+            </Modal>
 
-                            {/* Actions */}
-                            <View style={styles.actions}>
-                                <TouchableOpacity
-                                    onPress={handleDelete}
-                                    style={[styles.deleteButton, isDark && styles.deleteButtonDark]}
-                                >
-                                    <Text style={styles.deleteButtonText}>Delete</Text>
-                                </TouchableOpacity>
-                                <TouchableOpacity
-                                    onPress={handleSave}
-                                    style={styles.saveButton}
-                                >
-                                    <Text style={styles.saveButtonText}>Save Changes</Text>
-                                </TouchableOpacity>
-                            </View>
-                        </ScrollView>
-                    </View>
-                </KeyboardAvoidingView>
-            </View>
-        </Modal>
+            <CustomAlert
+                visible={deleteAlertVisible}
+                title="Delete Transaction"
+                message="Are you sure you want to delete this transaction?"
+                icon="trash-outline"
+                buttons={[
+                    {
+                        text: 'Cancel',
+                        style: 'cancel',
+                        onPress: () => setDeleteAlertVisible(false),
+                    },
+                    {
+                        text: 'Delete',
+                        style: 'destructive',
+                        onPress: async () => {
+                            setDeleteAlertVisible(false);
+                            await deleteTransaction(transaction.id);
+                            onClose();
+                        },
+                    },
+                ]}
+                onDismiss={() => setDeleteAlertVisible(false)}
+            />
+        </>
     );
 }
 

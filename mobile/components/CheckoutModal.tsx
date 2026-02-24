@@ -1,8 +1,8 @@
 import { format } from 'date-fns';
 import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
-import { useState } from 'react';
-import { KeyboardAvoidingView, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { Alert, KeyboardAvoidingView, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSales } from '../context/SalesContext';
 import { useTheme } from '../hooks/useTheme';
 
@@ -11,34 +11,65 @@ interface CheckoutModalProps {
     onClose: () => void;
 }
 
+import { useAuth } from '../context/AuthContext';
+
 export default function CheckoutModal({ visible, onClose }: CheckoutModalProps) {
     const { cart, removeFromCart, addTransaction } = useSales();
+    const { user } = useAuth();
     const { colorScheme } = useTheme();
     const isDark = colorScheme === 'dark';
 
     const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card' | 'upi'>('cash');
     const [tip, setTip] = useState('');
+    const [loading, setLoading] = useState(false);
 
     const totalAmount = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
     const finalAmount = totalAmount + (parseFloat(tip) || 0);
 
+    // If the cart becomes empty while the modal is open (e.g. after confirming a sale),
+    // simply close the modal instead of briefly showing a "Cart is empty" state.
+    useEffect(() => {
+        if (visible && cart.length === 0) {
+            onClose();
+        }
+    }, [visible, cart.length, onClose]);
+
     const handleConfirm = async () => {
         if (cart.length === 0) return;
+        if (!user) {
+            Alert.alert('Not logged in', 'You must be logged in to confirm a sale.');
+            return;
+        }
 
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        setLoading(true);
+        let timeoutId;
+        try {
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            timeoutId = setTimeout(() => {
+                setLoading(false);
+                Alert.alert('Timeout', 'Sale confirmation took too long. Please check your connection.');
+            }, 10000); // 10 seconds fallback
 
-        await addTransaction({
-            items: cart,
-            totalAmount: finalAmount,
-            paymentMethod,
-            tip: parseFloat(tip) || 0,
-            date: format(new Date(), 'yyyy-MM-dd'),
-        });
+            await addTransaction({
+                items: cart,
+                totalAmount: finalAmount,
+                paymentMethod,
+                tip: parseFloat(tip) || 0,
+                date: format(new Date(), 'yyyy-MM-dd'),
+            });
+            clearTimeout(timeoutId);
 
-        // Reset state for next time
-        setPaymentMethod('cash');
-        setTip('');
-        onClose();
+            // Silent success: reset state and close without showing an alert
+            setPaymentMethod('cash');
+            setTip('');
+            onClose();
+        } catch (error) {
+            clearTimeout(timeoutId);
+            Alert.alert('Error', 'Failed to confirm sale. Please try again.');
+            console.error('Confirm sale error:', error);
+        } finally {
+            setLoading(false);
+        }
     };
 
     const handleCancel = () => {
@@ -55,40 +86,6 @@ export default function CheckoutModal({ visible, onClose }: CheckoutModalProps) 
         // But since the button to open this modal is only visible if cart.length > 0 in dashboard,
         // it's likely fine. However, removing items until 0 inside the modal is possible.
     };
-
-    // If cart is empty while modal is open (e.g. removed all items), show empty state or close
-    if (visible && cart.length === 0) {
-        // Maybe better to just close it effectively? 
-        // Or show "Cart is empty" message.
-        // Let's stick effectively to original logic but adapted for Modal.
-        return (
-            <Modal
-                animationType="fade"
-                transparent={true}
-                visible={visible}
-                onRequestClose={handleCancel}
-            >
-                <View style={styles.container}>
-                    <BlurView
-                        intensity={100}
-                        tint={isDark ? 'dark' : 'light'}
-                        style={styles.blurView}
-                    />
-                    <TouchableOpacity
-                        style={styles.backdrop}
-                        activeOpacity={1}
-                        onPress={handleCancel}
-                    />
-                    <View style={[styles.modal, isDark && styles.modalDark, { height: 'auto', paddingVertical: 40 }]}>
-                        <Text style={[styles.emptyText, isDark && styles.emptyTextDark]}>Cart is empty</Text>
-                        <TouchableOpacity onPress={handleCancel} style={styles.backButton}>
-                            <Text style={styles.backButtonText}>Close</Text>
-                        </TouchableOpacity>
-                    </View>
-                </View>
-            </Modal>
-        )
-    }
 
     return (
         <Modal
@@ -110,111 +107,222 @@ export default function CheckoutModal({ visible, onClose }: CheckoutModalProps) 
                     onPress={handleCancel}
                 />
 
-                <KeyboardAvoidingView
-                    behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-                    style={styles.keyboardView}
-                >
-                    <View style={[styles.modal, isDark && styles.modalDark]}>
-                        <View style={styles.header}>
-                            <Text style={[styles.title, isDark && styles.titleDark]}>Checkout</Text>
-                            <Text style={[styles.itemCount, isDark && styles.itemCountDark]}>{cart.length} items</Text>
-                        </View>
+                {Platform.OS === 'ios' ? (
+                    <KeyboardAvoidingView
+                        behavior="padding"
+                        style={styles.keyboardView}
+                    >
+                        <View style={[styles.modal, isDark && styles.modalDark]}>
+                            <View style={styles.header}>
+                                <Text style={[styles.title, isDark && styles.titleDark]}>Checkout</Text>
+                                <Text style={[styles.itemCount, isDark && styles.itemCountDark]}>{cart.length} items</Text>
+                            </View>
 
-                        <ScrollView style={styles.itemsList} showsVerticalScrollIndicator={false}>
-                            {cart.map((item) => (
-                                <View key={item.id} style={[styles.itemRow, isDark && styles.itemRowDark]}>
-                                    <View style={styles.itemInfo}>
-                                        <Text style={[styles.itemName, isDark && styles.itemNameDark]}>{item.productName}</Text>
-                                        <Text style={[styles.itemDetails, isDark && styles.itemDetailsDark]}>
-                                            {item.quantity}x ${item.price.toFixed(2)}
-                                        </Text>
+                            <ScrollView style={styles.itemsList} showsVerticalScrollIndicator={false}>
+                                {cart.map((item) => (
+                                    <View key={item.id} style={[styles.itemRow, isDark && styles.itemRowDark]}>
+                                        <View style={styles.itemInfo}>
+                                            <Text style={[styles.itemName, isDark && styles.itemNameDark]}>{item.productName}</Text>
+                                            <Text style={[styles.itemDetails, isDark && styles.itemDetailsDark]}>
+                                                {item.quantity}x ${item.price.toFixed(2)}
+                                            </Text>
+                                        </View>
+                                        <View style={styles.itemRight}>
+                                            <Text style={[styles.itemTotal, isDark && styles.itemTotalDark]}>
+                                                ${(item.quantity * item.price).toFixed(2)}
+                                            </Text>
+                                            <TouchableOpacity
+                                                onPress={() => handleRemoveItem(item.id)}
+                                                style={styles.removeButton}
+                                            >
+                                                <Text style={styles.removeButtonText}>✕</Text>
+                                            </TouchableOpacity>
+                                        </View>
                                     </View>
-                                    <View style={styles.itemRight}>
-                                        <Text style={[styles.itemTotal, isDark && styles.itemTotalDark]}>
-                                            ${(item.quantity * item.price).toFixed(2)}
-                                        </Text>
+                                ))}
+                            </ScrollView>
+
+                            <View style={styles.footer}>
+                                {/* Payment Method */}
+                                <View style={styles.section}>
+                                    <Text style={[styles.label, isDark && styles.labelDark]}>Payment Method</Text>
+                                    <View style={styles.paymentButtons}>
+                                        {(['cash', 'card', 'upi'] as const).map(method => {
+                                            const isSelected = paymentMethod === method;
+                                            return (
+                                                <TouchableOpacity
+                                                    key={method}
+                                                    onPress={() => setPaymentMethod(method)}
+                                                    style={[
+                                                        styles.paymentButton,
+                                                        isSelected && styles.paymentButtonSelected,
+                                                        isDark && !isSelected && styles.paymentButtonDark,
+                                                    ]}
+                                                >
+                                                    <Text style={[
+                                                        styles.paymentButtonText,
+                                                        isSelected && styles.paymentButtonTextSelected,
+                                                        isDark && !isSelected && styles.paymentButtonTextDark,
+                                                    ]}>
+                                                        {method.toUpperCase()}
+                                                    </Text>
+                                                </TouchableOpacity>
+                                            );
+                                        })}
+                                    </View>
+                                </View>
+
+                                {/* Tip */}
+                                <View style={styles.section}>
+                                    <Text style={[styles.label, isDark && styles.labelDark]}>Tip (Optional)</Text>
+                                    <View style={[styles.tipInput, isDark && styles.tipInputDark]}>
+                                        <Text style={[styles.dollarSign, isDark && styles.dollarSignDark]}>$</Text>
+                                        <TextInput
+                                            value={tip}
+                                            onChangeText={setTip}
+                                            placeholder="0.00"
+                                            placeholderTextColor={isDark ? '#8e8e93' : '#c7c7cc'}
+                                            keyboardType="numeric"
+                                            style={[styles.tipTextInput, isDark && styles.tipTextInputDark]}
+                                        />
+                                    </View>
+                                </View>
+
+                                {/* Total & Actions */}
+                                <View style={styles.totalSection}>
+                                    <View style={styles.totalRow}>
+                                        <Text style={[styles.totalLabel, isDark && styles.totalLabelDark]}>Total Amount</Text>
+                                        <Text style={styles.totalValue}>${finalAmount.toFixed(2)}</Text>
+                                    </View>
+
+                                    <View style={styles.actions}>
                                         <TouchableOpacity
-                                            onPress={() => handleRemoveItem(item.id)}
-                                            style={styles.removeButton}
+                                            onPress={handleCancel}
+                                            style={[styles.cancelButton, isDark && styles.cancelButtonDark]}
                                         >
-                                            <Text style={styles.removeButtonText}>✕</Text>
+                                            <Text style={[styles.cancelButtonText, isDark && styles.cancelButtonTextDark]}>Back</Text>
+                                        </TouchableOpacity>
+                                        <TouchableOpacity
+                                            onPress={handleConfirm}
+                                            style={[styles.confirmButton, loading && { opacity: 0.6 }]}
+                                            disabled={loading}
+                                        >
+                                            <Text style={styles.confirmButtonText}>
+                                                {loading ? 'Processing...' : 'Confirm Sale'}
+                                            </Text>
                                         </TouchableOpacity>
                                     </View>
                                 </View>
-                            ))}
-                        </ScrollView>
+                            </View>
+                        </View>
+                    </KeyboardAvoidingView>
+                ) : (
+                    <View style={styles.keyboardView}>
+                        <View style={[styles.modal, isDark && styles.modalDark]}>
+                            <View style={styles.header}>
+                                <Text style={[styles.title, isDark && styles.titleDark]}>Checkout</Text>
+                                <Text style={[styles.itemCount, isDark && styles.itemCountDark]}>{cart.length} items</Text>
+                            </View>
 
-                        <View style={styles.footer}>
-                            {/* Payment Method */}
-                            <View style={styles.section}>
-                                <Text style={[styles.label, isDark && styles.labelDark]}>Payment Method</Text>
-                                <View style={styles.paymentButtons}>
-                                    {(['cash', 'card', 'upi'] as const).map(method => {
-                                        const isSelected = paymentMethod === method;
-                                        return (
+                            <ScrollView style={styles.itemsList} showsVerticalScrollIndicator={false}>
+                                {cart.map((item) => (
+                                    <View key={item.id} style={[styles.itemRow, isDark && styles.itemRowDark]}>
+                                        <View style={styles.itemInfo}>
+                                            <Text style={[styles.itemName, isDark && styles.itemNameDark]}>{item.productName}</Text>
+                                            <Text style={[styles.itemDetails, isDark && styles.itemDetailsDark]}>
+                                                {item.quantity}x ${item.price.toFixed(2)}
+                                            </Text>
+                                        </View>
+                                        <View style={styles.itemRight}>
+                                            <Text style={[styles.itemTotal, isDark && styles.itemTotalDark]}>
+                                                ${(item.quantity * item.price).toFixed(2)}
+                                            </Text>
                                             <TouchableOpacity
-                                                key={method}
-                                                onPress={() => setPaymentMethod(method)}
-                                                style={[
-                                                    styles.paymentButton,
-                                                    isSelected && styles.paymentButtonSelected,
-                                                    isDark && !isSelected && styles.paymentButtonDark,
-                                                ]}
+                                                onPress={() => handleRemoveItem(item.id)}
+                                                style={styles.removeButton}
                                             >
-                                                <Text style={[
-                                                    styles.paymentButtonText,
-                                                    isSelected && styles.paymentButtonTextSelected,
-                                                    isDark && !isSelected && styles.paymentButtonTextDark,
-                                                ]}>
-                                                    {method.toUpperCase()}
-                                                </Text>
+                                                <Text style={styles.removeButtonText}>✕</Text>
                                             </TouchableOpacity>
-                                        );
-                                    })}
-                                </View>
-                            </View>
+                                        </View>
+                                    </View>
+                                ))}
+                            </ScrollView>
 
-                            {/* Tip */}
-                            <View style={styles.section}>
-                                <Text style={[styles.label, isDark && styles.labelDark]}>Tip (Optional)</Text>
-                                <View style={[styles.tipInput, isDark && styles.tipInputDark]}>
-                                    <Text style={[styles.dollarSign, isDark && styles.dollarSignDark]}>$</Text>
-                                    <TextInput
-                                        value={tip}
-                                        onChangeText={setTip}
-                                        placeholder="0.00"
-                                        placeholderTextColor={isDark ? '#8e8e93' : '#c7c7cc'}
-                                        keyboardType="numeric"
-                                        style={[styles.tipTextInput, isDark && styles.tipTextInputDark]}
-                                    />
+                            <View style={styles.footer}>
+                                {/* Payment Method */}
+                                <View style={styles.section}>
+                                    <Text style={[styles.label, isDark && styles.labelDark]}>Payment Method</Text>
+                                    <View style={styles.paymentButtons}>
+                                        {(['cash', 'card', 'upi'] as const).map(method => {
+                                            const isSelected = paymentMethod === method;
+                                            return (
+                                                <TouchableOpacity
+                                                    key={method}
+                                                    onPress={() => setPaymentMethod(method)}
+                                                    style={[
+                                                        styles.paymentButton,
+                                                        isSelected && styles.paymentButtonSelected,
+                                                        isDark && !isSelected && styles.paymentButtonDark,
+                                                    ]}
+                                                >
+                                                    <Text style={[
+                                                        styles.paymentButtonText,
+                                                        isSelected && styles.paymentButtonTextSelected,
+                                                        isDark && !isSelected && styles.paymentButtonTextDark,
+                                                    ]}>
+                                                        {method.toUpperCase()}
+                                                    </Text>
+                                                </TouchableOpacity>
+                                            );
+                                        })}
+                                    </View>
                                 </View>
-                            </View>
 
-                            {/* Total & Actions */}
-                            <View style={styles.totalSection}>
-                                <View style={styles.totalRow}>
-                                    <Text style={[styles.totalLabel, isDark && styles.totalLabelDark]}>Total Amount</Text>
-                                    <Text style={styles.totalValue}>${finalAmount.toFixed(2)}</Text>
+                                {/* Tip */}
+                                <View style={styles.section}>
+                                    <Text style={[styles.label, isDark && styles.labelDark]}>Tip (Optional)</Text>
+                                    <View style={[styles.tipInput, isDark && styles.tipInputDark]}>
+                                        <Text style={[styles.dollarSign, isDark && styles.dollarSignDark]}>$</Text>
+                                        <TextInput
+                                            value={tip}
+                                            onChangeText={setTip}
+                                            placeholder="0.00"
+                                            placeholderTextColor={isDark ? '#8e8e93' : '#c7c7cc'}
+                                            keyboardType="numeric"
+                                            style={[styles.tipTextInput, isDark && styles.tipTextInputDark]}
+                                        />
+                                    </View>
                                 </View>
 
-                                <View style={styles.actions}>
-                                    <TouchableOpacity
-                                        onPress={handleCancel}
-                                        style={[styles.cancelButton, isDark && styles.cancelButtonDark]}
-                                    >
-                                        <Text style={[styles.cancelButtonText, isDark && styles.cancelButtonTextDark]}>Back</Text>
-                                    </TouchableOpacity>
-                                    <TouchableOpacity
-                                        onPress={handleConfirm}
-                                        style={styles.confirmButton}
-                                    >
-                                        <Text style={styles.confirmButtonText}>Confirm Sale</Text>
-                                    </TouchableOpacity>
+                                {/* Total & Actions */}
+                                <View style={styles.totalSection}>
+                                    <View style={styles.totalRow}>
+                                        <Text style={[styles.totalLabel, isDark && styles.totalLabelDark]}>Total Amount</Text>
+                                        <Text style={styles.totalValue}>${finalAmount.toFixed(2)}</Text>
+                                    </View>
+
+                                    <View style={styles.actions}>
+                                        <TouchableOpacity
+                                            onPress={handleCancel}
+                                            style={[styles.cancelButton, isDark && styles.cancelButtonDark]}
+                                        >
+                                            <Text style={[styles.cancelButtonText, isDark && styles.cancelButtonTextDark]}>Back</Text>
+                                        </TouchableOpacity>
+                                        <TouchableOpacity
+                                            onPress={handleConfirm}
+                                            style={[styles.confirmButton, loading && { opacity: 0.6 }]}
+                                            disabled={loading}
+                                        >
+                                            <Text style={styles.confirmButtonText}>
+                                                {loading ? 'Processing...' : 'Confirm Sale'}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    </View>
                                 </View>
                             </View>
                         </View>
                     </View>
-                </KeyboardAvoidingView>
+                )}
             </View>
         </Modal>
     );
@@ -237,8 +345,8 @@ const styles = StyleSheet.create({
         height: '100%',
     },
     keyboardView: {
+        flex: 1,
         width: '100%',
-        height: '100%',
         justifyContent: 'flex-end',
         // Match app/checkout.tsx behavior which was full screen-ish but here we want it modal-like.
         // app/checkout.tsx had justifyContent: 'flex-end' for keyboardView and height '85%' for modal.
