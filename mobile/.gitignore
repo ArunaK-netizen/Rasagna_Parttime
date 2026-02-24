@@ -42,4 +42,4 @@ app-example
 /ios
 /android
 
-/mobile/serviceAccountKey.json
+serviceAccountKey.json
