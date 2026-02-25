@@ -1,4 +1,4 @@
-import { addMonths, endOfMonth, format, isSameMonth, parseISO, startOfMonth, subDays } from 'date-fns';
+import { endOfMonth, format, isSameMonth, parseISO, startOfMonth, subDays } from 'date-fns';
 import * as FileSystem from 'expo-file-system/legacy';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Print from 'expo-print';
@@ -7,6 +7,7 @@ import * as Sharing from 'expo-sharing';
 import { useState } from 'react';
 import { Alert, Dimensions, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { BarChart } from 'react-native-gifted-charts';
+import { Calendar } from 'react-native-calendars';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useSales } from '../../context/SalesContext';
 import { useTheme } from '../../hooks/useTheme';
@@ -18,7 +19,7 @@ export default function ReportsScreen() {
     const { colorScheme } = useTheme();
     const router = useRouter();
     const isDark = colorScheme === 'dark';
-    const [selectedMonth, setSelectedMonth] = useState(startOfMonth(new Date()));
+    const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
 
     // For charts: keep last 7 days overview
     const weekData = Array.from({ length: 7 }).map((_, i) => {
@@ -55,22 +56,20 @@ export default function ReportsScreen() {
     const totalTips = transactions.reduce((sum, t) => sum + (t.tip || 0), 0);
     const totalTransactions = transactions.length;
 
-    const today = format(new Date(), 'yyyy-MM-dd');
-    const todayTransactions = transactions.filter(t => t.date === today);
-    const todayRevenue = todayTransactions.reduce((sum, t) => {
+    const selectedDateObj = parseISO(selectedDate);
+
+    const selectedDayTransactions = transactions.filter(t => t.date === selectedDate);
+    const selectedDayRevenue = selectedDayTransactions.reduce((sum, t) => {
         if (t.items) {
             return sum + t.items.reduce((s, i) => s + (i.price * i.quantity), 0);
         }
         return sum + ((t.price || 0) * (t.quantity || 0));
     }, 0);
-    const todayTips = todayTransactions.reduce((sum, t) => sum + (t.tip || 0), 0);
+    const selectedDayTips = selectedDayTransactions.reduce((sum, t) => sum + (t.tip || 0), 0);
 
-    // Month-wise stats based on the selectedMonth
-    const monthStart = startOfMonth(selectedMonth);
-    const monthEnd = endOfMonth(selectedMonth);
-
+    // Month-wise stats based on the month of the selected date
     const monthTransactions = transactions.filter(t =>
-        isSameMonth(new Date(t.date), selectedMonth),
+        isSameMonth(parseISO(t.date), selectedDateObj),
     );
 
     const monthRevenue = monthTransactions.reduce((sum, t) => {
@@ -81,9 +80,9 @@ export default function ReportsScreen() {
     }, 0);
     const monthTips = monthTransactions.reduce((sum, t) => sum + (t.tip || 0), 0);
 
-    const generateTodayReport = async () => {
+    const generateSelectedDayReport = async () => {
         try {
-            const headingDate = new Date();
+            const headingDate = selectedDateObj;
             const html = `
                 <html>
                     <head>
@@ -102,9 +101,9 @@ export default function ReportsScreen() {
                         <p style="text-align: center; color: #666;">${format(headingDate, 'EEEE, MMMM do, yyyy')}</p>
                         
                         <div class="summary">
-                            <p><strong>Total Revenue:</strong> $${todayRevenue.toFixed(2)}</p>
-                            <p><strong>Total Tips:</strong> $${todayTips.toFixed(2)}</p>
-                            <p><strong>Transactions:</strong> ${todayTransactions.length}</p>
+                            <p><strong>Total Revenue:</strong> $${selectedDayRevenue.toFixed(2)}</p>
+                            <p><strong>Total Tips:</strong> $${selectedDayTips.toFixed(2)}</p>
+                            <p><strong>Transactions:</strong> ${selectedDayTransactions.length}</p>
                         </div>
 
                         <table>
@@ -118,7 +117,7 @@ export default function ReportsScreen() {
                                 </tr>
                             </thead>
                             <tbody>
-                                ${todayTransactions.map(t => {
+                                ${selectedDayTransactions.map(t => {
                 if (t.items && t.items.length > 0) {
                     const total = t.items.reduce((s, i) => s + (i.price * i.quantity), 0);
                     const itemsList = t.items.map(i => `${i.productName} (${i.quantity}x)`).join(', ');
@@ -144,7 +143,7 @@ export default function ReportsScreen() {
             }).join('')}
                                 <tr class="total-row">
                                     <td colspan="4" style="text-align: right;">Total</td>
-                                    <td>$${todayRevenue.toFixed(2)}</td>
+                                    <td>$${selectedDayRevenue.toFixed(2)}</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -154,7 +153,7 @@ export default function ReportsScreen() {
 
             const { uri } = await Print.printToFileAsync({ html });
 
-            const fileName = `${today}.pdf`;
+            const fileName = `${selectedDate}.pdf`;
             const targetUri = FileSystem.cacheDirectory + fileName;
 
             try {
@@ -177,7 +176,7 @@ export default function ReportsScreen() {
 
     const generateMonthReport = async () => {
         try {
-            const date = selectedMonth;
+            const date = selectedDateObj;
             const currentMonthStart = startOfMonth(date);
             const currentMonthEnd = endOfMonth(date);
             const monthName = format(date, 'MMMM yyyy');
@@ -290,29 +289,34 @@ export default function ReportsScreen() {
                 >
                     <Text style={[styles.title, isDark && styles.titleDark]}>Reports</Text>
 
-                    {/* Month Selector */}
+                    {/* Calendar for selecting a specific date */}
                     <View style={[styles.calendarCard, isDark && styles.calendarCardDark]}>
-                        <View style={styles.monthSelectorRow}>
-                            <TouchableOpacity
-                                onPress={() => setSelectedMonth(prev => addMonths(prev, -1))}
-                                style={[styles.monthArrowButton, isDark && styles.monthArrowButtonDark]}
-                            >
-                                <Text style={[styles.monthArrowText, isDark && styles.monthArrowTextDark]}>{'‹'}</Text>
-                            </TouchableOpacity>
-                            <Text style={[styles.monthSelectorText, isDark && styles.monthSelectorTextDark]}>
-                                {format(selectedMonth, 'MMMM yyyy')}
-                            </Text>
-                            <TouchableOpacity
-                                onPress={() => setSelectedMonth(prev => addMonths(prev, 1))}
-                                style={[styles.monthArrowButton, isDark && styles.monthArrowButtonDark]}
-                            >
-                                <Text style={[styles.monthArrowText, isDark && styles.monthArrowTextDark]}>{'›'}</Text>
-                            </TouchableOpacity>
-                        </View>
+                        <Calendar
+                            current={selectedDate}
+                            onDayPress={(day: any) => {
+                                setSelectedDate(day.dateString);
+                            }}
+                            markedDates={{
+                                [selectedDate]: {
+                                    selected: true,
+                                    selectedColor: isDark ? '#0A84FF' : '#007AFF',
+                                    selectedTextColor: '#ffffff',
+                                },
+                            }}
+                            theme={{
+                                backgroundColor: isDark ? '#1c1c1e' : '#ffffff',
+                                calendarBackground: isDark ? '#1c1c1e' : '#ffffff',
+                                dayTextColor: isDark ? '#ffffff' : '#000000',
+                                monthTextColor: isDark ? '#ffffff' : '#000000',
+                                todayTextColor: '#FF9500',
+                                arrowColor: isDark ? '#ffffff' : '#000000',
+                            }}
+                        />
                     </View>
 
-                    {/* Selected Month Stats & Actions */}
+                    {/* Selected Month & Day Stats + Actions */}
                     <View style={styles.actionsContainer}>
+                        {/* Month stats for the month of the selected date */}
                         <View style={styles.statsGrid}>
                             <View style={[styles.statCard, isDark && styles.statCardDark]}>
                                 <Text style={[styles.statLabel, isDark && styles.statLabelDark]}>Revenue</Text>
@@ -334,12 +338,40 @@ export default function ReportsScreen() {
                             </View>
                         </View>
 
+                        {/* Selected day stats */}
+                        <View style={styles.statsGrid}>
+                            <View style={[styles.statCard, isDark && styles.statCardDark]}>
+                                <Text style={[styles.statLabel, isDark && styles.statLabelDark]}>
+                                    Day Revenue
+                                </Text>
+                                <Text style={[styles.statValue, isDark && styles.statValueDark]}>
+                                    ${selectedDayRevenue.toFixed(2)}
+                                </Text>
+                            </View>
+                            <View style={[styles.statCard, isDark && styles.statCardDark]}>
+                                <Text style={[styles.statLabel, isDark && styles.statLabelDark]}>
+                                    Day Tips
+                                </Text>
+                                <Text style={[styles.statValue, isDark && styles.statValueDark]}>
+                                    ${selectedDayTips.toFixed(2)}
+                                </Text>
+                            </View>
+                            <View style={[styles.statCard, isDark && styles.statCardDark]}>
+                                <Text style={[styles.statLabel, isDark && styles.statLabelDark]}>
+                                    Day Count
+                                </Text>
+                                <Text style={[styles.statValue, isDark && styles.statValueDark]}>
+                                    {selectedDayTransactions.length}
+                                </Text>
+                            </View>
+                        </View>
+
                         <View style={styles.buttonRow}>
                             <TouchableOpacity
                                 style={[styles.actionButton, styles.primaryButton]}
-                                onPress={generateTodayReport}
+                                onPress={generateSelectedDayReport}
                             >
-                                <Text style={styles.primaryButtonText}>Today Report</Text>
+                                <Text style={styles.primaryButtonText}>Day Report</Text>
                             </TouchableOpacity>
                             <TouchableOpacity
                                 style={[styles.actionButton, styles.secondaryButton, isDark && styles.secondaryButtonDark]}
