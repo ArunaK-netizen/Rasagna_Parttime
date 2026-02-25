@@ -1,14 +1,13 @@
-// Import the functions you need from the SDKs you need
-import { getAnalytics } from '@react-native-firebase/analytics';
-import { getAuth } from '@react-native-firebase/auth';
-import { getFirestore } from '@react-native-firebase/firestore';
+import firestore from '@react-native-firebase/firestore';
 
-// TODO: Add SDKs for Firebase products that you want to use
-// https://firebase.google.com/docs/web/setup#available-libraries
+// Lazily access native Firebase from React Native runtime only.
+// Avoid calling any native Firebase APIs at module top level so that
+// static rendering / export (Node environment) does not crash.
 
-import app from '@react-native-firebase/app';
-export const auth = getAuth();
-export const db = getFirestore();
-export const analytics = getAnalytics();
+export const getDb = () => {
+  return firestore();
+};
 
-export default app;
+export default {
+  getDb,
+};

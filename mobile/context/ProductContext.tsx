@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { collection, onSnapshot, query, where } from '@react-native-firebase/firestore';
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { db } from '../firebase';
+import { getDb } from '../firebase';
 import { useAuth } from './AuthContext';
 
 export type Product = {
@@ -73,6 +73,7 @@ export const ProductProvider = ({ children }: { children: React.ReactNode }) => 
     const loadProductsFromFirestore = () => {
         if (!user) return () => {};
 
+        const db = getDb();
         // Scope products to the current user for scalability
         const q = query(
             collection(db, 'products'),
