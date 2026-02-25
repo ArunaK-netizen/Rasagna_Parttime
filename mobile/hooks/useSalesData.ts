@@ -1,7 +1,7 @@
 import { addDoc, collection, deleteDoc, doc, onSnapshot, orderBy, query, updateDoc, where } from '@react-native-firebase/firestore';
 import { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { db } from '../firebase';
+import { getDb } from '../firebase';
 import { useAnalytics } from './useAnalytics';
 
 export type TransactionItem = {
@@ -44,6 +44,8 @@ export const useSalesData = () => {
         }
 
         setLoading(true);
+
+        const db = getDb();
 
         // Load all transactions ordered by time.
         // (Current data doesn't reliably store a per-user key, so we avoid filtering here
@@ -112,6 +114,7 @@ export const useSalesData = () => {
             userName: user.displayName || undefined,
         };
 
+        const db = getDb();
         const docRef = await addDoc(collection(db, 'transactions'), newTransaction);
 
         // Optimistically update local state so UI reflects the new sale immediately
@@ -130,11 +133,13 @@ export const useSalesData = () => {
     };
 
     const deleteTransaction = async (id: string) => {
+        const db = getDb();
         await deleteDoc(doc(db, 'transactions', id));
     };
 
     const updateTransaction = async (updatedTransaction: Transaction) => {
         const { id, ...data } = updatedTransaction;
+        const db = getDb();
         await updateDoc(doc(db, 'transactions', id), data);
     };
 

@@ -178,7 +178,7 @@ export default function CalendarScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#f2f2f7',
+        backgroundColor: '#000000',
     },
     containerDark: {
         backgroundColor: '#000000',
@@ -189,6 +189,7 @@ const styles = StyleSheet.create({
         left: 0,
         right: 0,
         height: 280,
+        opacity: 0, // visually solid black background
     },
     safeArea: {
         flex: 1,

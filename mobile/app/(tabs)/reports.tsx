@@ -289,7 +289,7 @@ export default function ReportsScreen() {
                 >
                     <Text style={[styles.title, isDark && styles.titleDark]}>Reports</Text>
 
-                    {/* Calendar for selecting a specific date */}
+                    {/* Calendar for selecting a specific date (match History tab styling) */}
                     <View style={[styles.calendarCard, isDark && styles.calendarCardDark]}>
                         <Calendar
                             current={selectedDate}
@@ -299,17 +299,30 @@ export default function ReportsScreen() {
                             markedDates={{
                                 [selectedDate]: {
                                     selected: true,
-                                    selectedColor: isDark ? '#0A84FF' : '#007AFF',
+                                    selectedColor: '#007AFF',
                                     selectedTextColor: '#ffffff',
                                 },
                             }}
                             theme={{
-                                backgroundColor: isDark ? '#1c1c1e' : '#ffffff',
-                                calendarBackground: isDark ? '#1c1c1e' : '#ffffff',
+                                backgroundColor: 'transparent',
+                                calendarBackground: 'transparent',
+                                textSectionTitleColor: isDark ? '#98989d' : '#8e8e93',
+                                selectedDayBackgroundColor: '#007AFF',
+                                selectedDayTextColor: '#ffffff',
+                                todayTextColor: '#007AFF',
                                 dayTextColor: isDark ? '#ffffff' : '#000000',
+                                textDisabledColor: isDark ? '#48484a' : '#c7c7cc',
+                                dotColor: '#007AFF',
+                                selectedDotColor: '#ffffff',
+                                arrowColor: '#007AFF',
                                 monthTextColor: isDark ? '#ffffff' : '#000000',
-                                todayTextColor: '#FF9500',
-                                arrowColor: isDark ? '#ffffff' : '#000000',
+                                indicatorColor: '#007AFF',
+                                textDayFontFamily: 'Outfit_400Regular',
+                                textMonthFontFamily: 'Outfit_700Bold',
+                                textDayHeaderFontFamily: 'Outfit_600SemiBold',
+                                textDayFontSize: 16,
+                                textMonthFontSize: 18,
+                                textDayHeaderFontSize: 13,
                             }}
                         />
                     </View>
@@ -317,6 +330,9 @@ export default function ReportsScreen() {
                     {/* Selected Month & Day Stats + Actions */}
                     <View style={styles.actionsContainer}>
                         {/* Month stats for the month of the selected date */}
+                        <Text style={[styles.sectionTitle, isDark && styles.sectionTitleDark]}>
+                            Month overview
+                        </Text>
                         <View style={styles.statsGrid}>
                             <View style={[styles.statCard, isDark && styles.statCardDark]}>
                                 <Text style={[styles.statLabel, isDark && styles.statLabelDark]}>Revenue</Text>
@@ -339,6 +355,9 @@ export default function ReportsScreen() {
                         </View>
 
                         {/* Selected day stats */}
+                        <Text style={[styles.sectionTitle, isDark && styles.sectionTitleDark]}>
+                            Day overview
+                        </Text>
                         <View style={styles.statsGrid}>
                             <View style={[styles.statCard, isDark && styles.statCardDark]}>
                                 <Text style={[styles.statLabel, isDark && styles.statLabelDark]}>
@@ -422,7 +441,7 @@ export default function ReportsScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#f2f2f7',
+        backgroundColor: '#000000',
     },
     containerDark: {
         backgroundColor: '#000000',
@@ -433,6 +452,7 @@ const styles = StyleSheet.create({
         left: 0,
         right: 0,
         height: 280,
+        opacity: 0, // keep structure but visually solid black
     },
     safeArea: {
         flex: 1,
@@ -554,7 +574,7 @@ const styles = StyleSheet.create({
         color: '#ffffff',
     },
     actionsContainer: {
-        marginTop: 80,
+        marginTop: 40,
         marginBottom: 24,
     },
     selectedDateText: {
