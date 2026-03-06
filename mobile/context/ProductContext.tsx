@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { collection, onSnapshot, query, where } from '@react-native-firebase/firestore';
+import { collection, onSnapshot, query } from '@react-native-firebase/firestore';
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { getDb } from '../firebase';
 import { useAuth } from './AuthContext';
@@ -25,8 +25,8 @@ export const ProductProvider = ({ children }: { children: React.ReactNode }) => 
     const [products, setProducts] = useState<Record<string, Product[]>>({});
     const [loading, setLoading] = useState(true);
 
-    // Key for AsyncStorage (per user to avoid leaking old cache)
-    const PRODUCTS_CACHE_KEY = user ? `products_cache_${user.uid}` : 'products_cache';
+    // Single shared cache key — products belong to the store, not a specific user
+    const PRODUCTS_CACHE_KEY = 'products_cache_global';
 
     useEffect(() => {
         let unsubscribe: (() => void) | undefined;
@@ -71,13 +71,12 @@ export const ProductProvider = ({ children }: { children: React.ReactNode }) => 
     };
 
     const loadProductsFromFirestore = () => {
-        if (!user) return () => {};
+        if (!user) return () => { };
 
         const db = getDb();
-        // Scope products to the current user for scalability
+        // Products are shared store-wide — not scoped per user
         const q = query(
             collection(db, 'products'),
-            where('userId', '==', user.uid),
         );
         const unsubscribe = onSnapshot(q, async (querySnapshot) => {
             const productsData: Record<string, Product[]> = {};
@@ -92,7 +91,7 @@ export const ProductProvider = ({ children }: { children: React.ReactNode }) => 
             // Update cache
             try {
                 await AsyncStorage.setItem(PRODUCTS_CACHE_KEY, JSON.stringify(productsData));
-            } catch (e) {}
+            } catch (e) { }
             setLoading(false);
         });
         return unsubscribe;

@@ -1,8 +1,7 @@
-import { Tabs } from 'expo-router';
-import { BlurView } from 'expo-blur';
-import { Platform, View, Text, StyleSheet } from 'react-native';
-import { useTheme } from '../../hooks/useTheme';
 import { Ionicons } from '@expo/vector-icons';
+import { Tabs } from 'expo-router';
+import { Platform, StyleSheet, View } from 'react-native';
+import { useTheme } from '../../hooks/useTheme';
 
 export default function TabLayout() {
   const { colorScheme } = useTheme();
@@ -78,6 +77,20 @@ export default function TabLayout() {
               focused && styles.iconContainerFocused
             ]}>
               <Ionicons name={focused ? "bar-chart" : "bar-chart-outline"} size={24} color={color} />
+            </View>
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="profile"
+        options={{
+          title: 'Profile',
+          tabBarIcon: ({ color, focused }) => (
+            <View style={[
+              styles.iconContainer,
+              focused && styles.iconContainerFocused
+            ]}>
+              <Ionicons name={focused ? "person" : "person-outline"} size={24} color={color} />
             </View>
           ),
         }}

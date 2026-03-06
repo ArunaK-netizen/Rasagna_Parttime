@@ -1,9 +1,8 @@
-import { Ionicons } from '@expo/vector-icons';
 import { format } from 'date-fns';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { FlatList, Keyboard, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import CheckoutModal from '../../components/CheckoutModal';
@@ -14,12 +13,19 @@ import { useTheme } from '../../hooks/useTheme';
 export default function Dashboard() {
     const { transactions, cart } = useSales();
     const { products, categories } = useProducts();
-    const [selectedCategory, setSelectedCategory] = useState(categories[0] || 'snacks');
+    const [selectedCategory, setSelectedCategory] = useState<string>('');
     const [searchQuery, setSearchQuery] = useState('');
     const [isCheckoutVisible, setIsCheckoutVisible] = useState(false);
     const router = useRouter();
-    const { colorScheme, toggleColorScheme } = useTheme();
+    const { colorScheme } = useTheme();
     const isDark = colorScheme === 'dark';
+
+    // Sync selectedCategory whenever categories loads or changes (e.g. after logout → re-login)
+    useEffect(() => {
+        if (categories.length > 0 && (!selectedCategory || !categories.includes(selectedCategory))) {
+            setSelectedCategory(categories[0]);
+        }
+    }, [categories]);
 
     const today = format(new Date(), 'yyyy-MM-dd');
     const todaysTransactions = useMemo(
@@ -123,30 +129,6 @@ export default function Dashboard() {
                             {format(new Date(), 'EEEE, MMMM do')}
                         </Text>
                         <Text style={[styles.titleText, isDark && styles.titleTextDark]}>Daily Sales</Text>
-                    </View>
-                    <View style={styles.headerButtons}>
-                        <TouchableOpacity
-                            onPress={() => {
-                                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                                toggleColorScheme();
-                            }}
-                            style={[styles.iconButton, isDark && styles.iconButtonDark]}
-                        >
-                            <Ionicons
-                                name={isDark ? "sunny" : "moon"}
-                                size={22}
-                                color={isDark ? "#0A84FF" : "#007AFF"}
-                            />
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                            onPress={() => {
-                                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                                router.push('/profile');
-                            }}
-                            style={[styles.iconButton, isDark && styles.iconButtonDark]}
-                        >
-                            <Ionicons name="person-circle-outline" size={26} color={isDark ? "#0A84FF" : "#007AFF"} />
-                        </TouchableOpacity>
                     </View>
                 </View>
 

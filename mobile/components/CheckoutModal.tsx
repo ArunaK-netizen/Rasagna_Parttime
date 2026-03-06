@@ -14,7 +14,7 @@ interface CheckoutModalProps {
 import { useAuth } from '../context/AuthContext';
 
 export default function CheckoutModal({ visible, onClose }: CheckoutModalProps) {
-    const { cart, removeFromCart, addTransaction } = useSales();
+    const { cart, removeFromCart, updateCartItemQty, addTransaction } = useSales();
     const { user } = useAuth();
     const { colorScheme } = useTheme();
     const isDark = colorScheme === 'dark';
@@ -124,19 +124,28 @@ export default function CheckoutModal({ visible, onClose }: CheckoutModalProps) 
                                         <View style={styles.itemInfo}>
                                             <Text style={[styles.itemName, isDark && styles.itemNameDark]}>{item.productName}</Text>
                                             <Text style={[styles.itemDetails, isDark && styles.itemDetailsDark]}>
-                                                {item.quantity}x ${item.price.toFixed(2)}
+                                                ${item.price.toFixed(2)} each
                                             </Text>
                                         </View>
                                         <View style={styles.itemRight}>
                                             <Text style={[styles.itemTotal, isDark && styles.itemTotalDark]}>
                                                 ${(item.quantity * item.price).toFixed(2)}
                                             </Text>
-                                            <TouchableOpacity
-                                                onPress={() => handleRemoveItem(item.id)}
-                                                style={styles.removeButton}
-                                            >
-                                                <Text style={styles.removeButtonText}>✕</Text>
-                                            </TouchableOpacity>
+                                            <View style={styles.qtyControls}>
+                                                <TouchableOpacity
+                                                    onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); updateCartItemQty(item.id, -1); }}
+                                                    style={[styles.qtyBtn, isDark && styles.qtyBtnDark]}
+                                                >
+                                                    <Text style={[styles.qtyBtnText, isDark && styles.qtyBtnTextDark]}>−</Text>
+                                                </TouchableOpacity>
+                                                <Text style={[styles.qtyValue, isDark && styles.qtyValueDark]}>{item.quantity}</Text>
+                                                <TouchableOpacity
+                                                    onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); updateCartItemQty(item.id, 1); }}
+                                                    style={[styles.qtyBtn, isDark && styles.qtyBtnDark]}
+                                                >
+                                                    <Text style={[styles.qtyBtnText, isDark && styles.qtyBtnTextDark]}>+</Text>
+                                                </TouchableOpacity>
+                                            </View>
                                         </View>
                                     </View>
                                 ))}
@@ -230,19 +239,28 @@ export default function CheckoutModal({ visible, onClose }: CheckoutModalProps) 
                                         <View style={styles.itemInfo}>
                                             <Text style={[styles.itemName, isDark && styles.itemNameDark]}>{item.productName}</Text>
                                             <Text style={[styles.itemDetails, isDark && styles.itemDetailsDark]}>
-                                                {item.quantity}x ${item.price.toFixed(2)}
+                                                ${item.price.toFixed(2)} each
                                             </Text>
                                         </View>
                                         <View style={styles.itemRight}>
                                             <Text style={[styles.itemTotal, isDark && styles.itemTotalDark]}>
                                                 ${(item.quantity * item.price).toFixed(2)}
                                             </Text>
-                                            <TouchableOpacity
-                                                onPress={() => handleRemoveItem(item.id)}
-                                                style={styles.removeButton}
-                                            >
-                                                <Text style={styles.removeButtonText}>✕</Text>
-                                            </TouchableOpacity>
+                                            <View style={styles.qtyControls}>
+                                                <TouchableOpacity
+                                                    onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); updateCartItemQty(item.id, -1); }}
+                                                    style={[styles.qtyBtn, isDark && styles.qtyBtnDark]}
+                                                >
+                                                    <Text style={[styles.qtyBtnText, isDark && styles.qtyBtnTextDark]}>−</Text>
+                                                </TouchableOpacity>
+                                                <Text style={[styles.qtyValue, isDark && styles.qtyValueDark]}>{item.quantity}</Text>
+                                                <TouchableOpacity
+                                                    onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); updateCartItemQty(item.id, 1); }}
+                                                    style={[styles.qtyBtn, isDark && styles.qtyBtnDark]}
+                                                >
+                                                    <Text style={[styles.qtyBtnText, isDark && styles.qtyBtnTextDark]}>+</Text>
+                                                </TouchableOpacity>
+                                            </View>
                                         </View>
                                     </View>
                                 ))}
@@ -446,6 +464,42 @@ const styles = StyleSheet.create({
         fontSize: 14,
         color: '#FF3B30',
         fontWeight: 'bold',
+    },
+    qtyControls: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        marginTop: 4,
+    },
+    qtyBtn: {
+        width: 28,
+        height: 28,
+        borderRadius: 14,
+        backgroundColor: '#f2f2f7',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    qtyBtnDark: {
+        backgroundColor: '#3a3a3c',
+    },
+    qtyBtnText: {
+        fontSize: 18,
+        fontFamily: 'Outfit_700Bold',
+        color: '#007AFF',
+        lineHeight: 22,
+    },
+    qtyBtnTextDark: {
+        color: '#0A84FF',
+    },
+    qtyValue: {
+        fontSize: 16,
+        fontFamily: 'Outfit_700Bold',
+        color: '#000000',
+        minWidth: 20,
+        textAlign: 'center',
+    },
+    qtyValueDark: {
+        color: '#ffffff',
     },
     footer: {
         gap: 20,

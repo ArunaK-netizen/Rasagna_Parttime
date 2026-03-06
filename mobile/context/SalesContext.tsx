@@ -1,5 +1,5 @@
 import React, { createContext, useContext } from 'react';
-import { useSalesData, Transaction, TransactionItem } from '../hooks/useSalesData';
+import { Transaction, TransactionItem, useSalesData } from '../hooks/useSalesData';
 
 type SalesContextType = {
     transactions: Transaction[];
@@ -10,6 +10,7 @@ type SalesContextType = {
     cart: TransactionItem[];
     addToCart: (item: Omit<TransactionItem, 'id'>) => void;
     removeFromCart: (itemId: string) => void;
+    updateCartItemQty: (itemId: string, delta: number) => void;
     clearCart: () => void;
 };
 

@@ -6,10 +6,15 @@
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "mobile",
-    "userInterfaceStyle": "automatic",
+    "userInterfaceStyle": "dark",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.blackdevil007.parttime",
+      "googleServicesFile": "./GoogleService-Info.plist",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -47,7 +52,7 @@
     ],
     "updates": {
       "url": "https://u.expo.dev/a078c8db-7c35-4340-99f3-1d02e95e4ac5",
-      "checkAutomatically": "ON_ERROR_RECOVERY",
+      "checkAutomatically": "NEVER",
       "fallbackToCacheTimeout": 30000
     },
     "experiments": {

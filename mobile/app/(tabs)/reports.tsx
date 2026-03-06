@@ -6,8 +6,8 @@ import { useRouter } from 'expo-router';
 import * as Sharing from 'expo-sharing';
 import { useState } from 'react';
 import { Alert, Dimensions, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { BarChart } from 'react-native-gifted-charts';
 import { Calendar } from 'react-native-calendars';
+import { BarChart } from 'react-native-gifted-charts';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useSales } from '../../context/SalesContext';
 import { useTheme } from '../../hooks/useTheme';
@@ -120,16 +120,17 @@ export default function ReportsScreen() {
                                 ${selectedDayTransactions.map(t => {
                 if (t.items && t.items.length > 0) {
                     const total = t.items.reduce((s, i) => s + (i.price * i.quantity), 0);
-                    const itemsList = t.items.map(i => `${i.productName} (${i.quantity}x)`).join(', ');
-                    return `
+                    // Each item gets its own row
+                    const rows = t.items.map(i => `
                                             <tr>
                                                 <td>${format(new Date(t.timestamp), 'HH:mm')}</td>
-                                                <td>${itemsList}</td>
-                                                <td>${t.items.length} items</td>
+                                                <td>${i.productName}</td>
+                                                <td>${i.quantity}</td>
                                                 <td>${t.paymentMethod.toUpperCase()}</td>
-                                                <td>$${total.toFixed(2)}</td>
+                                                <td>$${(i.price * i.quantity).toFixed(2)}</td>
                                             </tr>
-                                        `;
+                                        `).join('');
+                    return rows;
                 }
                 return `
                                         <tr>
@@ -297,12 +298,22 @@ export default function ReportsScreen() {
                                 setSelectedDate(day.dateString);
                             }}
                             markedDates={{
+                                // Blue dots on dates that have sales (excluding the selected date)
+                                ...transactions.reduce((acc, t) => {
+                                    if (t.date !== selectedDate) {
+                                        acc[t.date] = { ...(acc[t.date] || {}), marked: true, dotColor: '#007AFF' };
+                                    }
+                                    return acc;
+                                }, {} as any),
+                                // Selected date: highlight only, no dot
                                 [selectedDate]: {
                                     selected: true,
                                     selectedColor: '#007AFF',
                                     selectedTextColor: '#ffffff',
+                                    marked: false,
                                 },
                             }}
+                            style={{ backgroundColor: 'transparent' }}
                             theme={{
                                 backgroundColor: 'transparent',
                                 calendarBackground: 'transparent',
@@ -518,8 +529,7 @@ const styles = StyleSheet.create({
     calendarCard: {
         backgroundColor: '#ffffff',
         borderRadius: 20,
-        paddingVertical: 20,
-        paddingHorizontal: 16,
+        padding: 16,
         marginBottom: 0,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },

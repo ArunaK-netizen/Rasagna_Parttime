@@ -13,12 +13,13 @@ export function useAppUpdate() {
         async function checkUpdate() {
             try {
                 const update = await Updates.checkForUpdateAsync();
+                console.log('[OTA] Check result:', JSON.stringify(update));
                 if (update.isAvailable) {
                     setIsUpdateAvailable(true);
                     setManifest(update);
                 }
-            } catch (error) {
-                console.log('Error checking for updates:', error);
+            } catch (error: any) {
+                console.log('[OTA] Error:', error?.message);
             }
         }
 

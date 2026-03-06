@@ -3,7 +3,7 @@ import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
-import { Text, View } from 'react-native';
+import { View } from 'react-native';
 import { CustomSplashScreen } from '../components/CustomSplashScreen';
 import { UpdateModal } from '../components/UpdateModal';
 import { AuthProvider } from '../context/AuthContext';
@@ -22,16 +22,19 @@ SplashScreen.preventAutoHideAsync().catch(() => {
 function RootLayoutContent() {
   const { colorScheme } = useTheme();
   const { isUpdateAvailable, isDownloading, manifest, performUpdate, cancelUpdate } = useAppUpdate();
-  const fg = colorScheme === 'dark' ? '#fff' : '#000'; // still used by children if needed
 
   return (
     <>
-      <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
+      <StatusBar style="light" />
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="index" />
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="onboarding" options={{ animation: 'fade', gestureEnabled: false }} />
         <Stack.Screen name="modal" options={{ presentation: 'transparentModal', animation: 'fade' }} />
+        <Stack.Screen name="my-schedule" options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="leaderboard-page" options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="announcements-page" options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="pending" options={{ animation: 'fade', gestureEnabled: false }} />
       </Stack>
 
       <UpdateModal

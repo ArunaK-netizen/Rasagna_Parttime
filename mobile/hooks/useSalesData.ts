@@ -1,4 +1,4 @@
-import { addDoc, collection, deleteDoc, doc, onSnapshot, orderBy, query, updateDoc, where } from '@react-native-firebase/firestore';
+import { addDoc, collection, deleteDoc, doc, onSnapshot, orderBy, query, updateDoc } from '@react-native-firebase/firestore';
 import { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { getDb } from '../firebase';
@@ -100,6 +100,21 @@ export const useSalesData = () => {
         setCart(prev => prev.filter(item => item.id !== itemId));
     };
 
+    const updateCartItemQty = (itemId: string, delta: number) => {
+        setCart(prev => {
+            const idx = prev.findIndex(i => i.id === itemId);
+            if (idx < 0) return prev;
+            const updated = [...prev];
+            const newQty = updated[idx].quantity + delta;
+            if (newQty <= 0) {
+                // remove item if qty hits 0
+                return updated.filter(i => i.id !== itemId);
+            }
+            updated[idx] = { ...updated[idx], quantity: newQty };
+            return updated;
+        });
+    };
+
     const clearCart = () => {
         setCart([]);
     };
@@ -152,6 +167,7 @@ export const useSalesData = () => {
         cart,
         addToCart,
         removeFromCart,
+        updateCartItemQty,
         clearCart
     };
 };

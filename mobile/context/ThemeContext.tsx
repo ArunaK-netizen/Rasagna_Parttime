@@ -1,5 +1,4 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { STORAGE_KEYS, loadData, saveData } from '../utils/storage';
 import { useAuth } from './AuthContext';
 
 type Theme = 'light' | 'dark';
@@ -14,30 +13,16 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
     const { user } = useAuth();
-    const [colorScheme, setColorScheme] = useState<Theme>('light');
-    const [isLoading, setIsLoading] = useState(true);
+    const colorScheme: Theme = 'dark';
+    const [isLoading, setIsLoading] = useState(false);
 
     useEffect(() => {
-        (async () => {
-            setIsLoading(true);
-            await loadThemeFromStorage();
-        })();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
+        // Theme is strictly dark, no loading from storage needed
+        setIsLoading(false);
     }, [user]);
 
-    // Only use AsyncStorage for theme
-    const loadThemeFromStorage = async () => {
-        const storedTheme = await loadData(STORAGE_KEYS.THEME);
-        setColorScheme(storedTheme === 'dark' ? 'dark' : 'light');
-        setIsLoading(false);
-    };
-
-    // Toggle theme and persist to AsyncStorage only
-    const toggleColorScheme = async () => {
-        const newScheme = colorScheme === 'dark' ? 'light' : 'dark';
-        setColorScheme(newScheme);
-        await saveData(STORAGE_KEYS.THEME, newScheme);
-    };
+    // toggleColorScheme is a no-op
+    const toggleColorScheme = async () => { };
 
     return (
         <ThemeContext.Provider value={{ colorScheme, toggleColorScheme, isLoading }}>
