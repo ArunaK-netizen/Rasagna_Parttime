@@ -2,65 +2,63 @@
 import AppShell from '@/components/AppShell';
 import { Badge, EmptyState, formatCurrency, LoadingSpinner, PageHeader } from '@/components/UI';
 import { addProduct, deleteProduct, Product, updateProduct } from '@/lib/db';
-import { useProducts, useTransactions } from '@/lib/hooks';
-import { Check, Pencil, Plus, Trash2, X } from 'lucide-react';
+import { useProducts } from '@/lib/hooks';
+import { ArrowDown, ArrowUp, ArrowUpDown, Check, Pencil, Plus, Search, Trash2, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 export default function ProductsPage() {
     const { products, loading } = useProducts();
-    const { transactions } = useTransactions();
     const [showAdd, setShowAdd] = useState(false);
     const [editing, setEditing] = useState<string | null>(null);
     const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
-    const [form, setForm] = useState({ name: '', price: '', category: '', userId: '', userName: '' });
+    const [form, setForm] = useState({ name: '', price: '', category: '' });
     const [editForm, setEditForm] = useState<Partial<Product>>({});
     const [saving, setSaving] = useState(false);
-    const [sortBy, setSortBy] = useState<'name' | 'revenue' | 'qty' | 'price'>('revenue');
+    const [search, setSearch] = useState('');
+    const [sortBy, setSortBy] = useState<'name' | 'price' | 'category'>('name');
+    const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
 
-    // Compute sales per product
-    const productStats = useMemo(() => {
-        const map: Record<string, { revenue: number; qty: number }> = {};
-        for (const t of transactions) {
-            const items = t.items || (t.productName ? [{ productName: t.productName, price: t.price || 0, quantity: t.quantity || 1 }] : []);
-            for (const item of items) {
-                if (!map[item.productName]) map[item.productName] = { revenue: 0, qty: 0 };
-                map[item.productName].revenue += item.price * item.quantity;
-                map[item.productName].qty += item.quantity;
-            }
-        }
-        return map;
-    }, [transactions]);
-
-    const sorted = useMemo(() => {
-        const arr = [...products];
-        if (sortBy === 'name') return arr.sort((a, b) => a.name.localeCompare(b.name));
-        if (sortBy === 'price') return arr.sort((a, b) => b.price - a.price);
-        if (sortBy === 'revenue') return arr.sort((a, b) => (productStats[b.name]?.revenue || 0) - (productStats[a.name]?.revenue || 0));
-        if (sortBy === 'qty') return arr.sort((a, b) => (productStats[b.name]?.qty || 0) - (productStats[a.name]?.qty || 0));
+    const filtered = useMemo(() => {
+        const q = search.toLowerCase();
+        let arr = products.filter(p =>
+            p.name.toLowerCase().includes(q) ||
+            p.category.toLowerCase().includes(q)
+        );
+        arr.sort((a, b) => {
+            let cmp = 0;
+            if (sortBy === 'name') cmp = a.name.localeCompare(b.name);
+            else if (sortBy === 'price') cmp = a.price - b.price;
+            else if (sortBy === 'category') cmp = a.category.localeCompare(b.category);
+            return sortDir === 'asc' ? cmp : -cmp;
+        });
         return arr;
-    }, [products, sortBy, productStats]);
+    }, [products, search, sortBy, sortDir]);
+
+    const toggleSort = (col: typeof sortBy) => {
+        if (sortBy === col) setSortDir((d: 'asc' | 'desc') => d === 'asc' ? 'desc' : 'asc');
+        else { setSortBy(col); setSortDir('asc'); }
+    };
+
+    const SortIcon = ({ col }: { col: typeof sortBy }) => {
+        if (sortBy !== col) return <ArrowUpDown size={12} className="text-textTertiary" />;
+        return sortDir === 'asc' ? <ArrowUp size={12} className="text-blue" /> : <ArrowDown size={12} className="text-blue" />;
+    };
 
     const handleAdd = async () => {
         if (!form.name || !form.price || !form.category) return;
         setSaving(true);
         try {
             await addProduct({ name: form.name.trim(), price: parseFloat(form.price), category: form.category.trim().toLowerCase() });
-            setForm({ name: '', price: '', category: '', userId: '', userName: '' });
+            setForm({ name: '', price: '', category: '' });
             setShowAdd(false);
-        } finally {
-            setSaving(false);
-        }
+        } finally { setSaving(false); }
     };
 
     const handleEdit = async (id: string) => {
         if (!editForm.name || !editForm.price || !editForm.category) return;
         setSaving(true);
-        try {
-            await updateProduct(id, editForm);
-            setEditing(null);
-        } finally {
-            setSaving(false);
-        }
+        try { await updateProduct(id, editForm); setEditing(null); }
+        finally { setSaving(false); }
     };
 
     const handleDelete = async (id: string) => {
@@ -76,12 +74,10 @@ export default function ProductsPage() {
             <div className="p-6 max-w-7xl mx-auto">
                 <PageHeader
                     title="Products"
-                    subtitle={`${products.length} products`}
+                    subtitle={`${filtered.length} of ${products.length} products`}
                     action={
-                        <button
-                            onClick={() => setShowAdd(true)}
-                            className="flex items-center gap-2 bg-blue hover:bg-blue/90 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-all duration-200 active:scale-95"
-                        >
+                        <button onClick={() => setShowAdd(true)}
+                            className="flex items-center gap-2 bg-blue hover:bg-blue/90 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-all active:scale-95">
                             <Plus size={16} /> Add Product
                         </button>
                     }
@@ -96,11 +92,11 @@ export default function ProductsPage() {
                                 <button onClick={() => setShowAdd(false)} className="text-textTertiary hover:text-white transition-colors"><X size={18} /></button>
                             </div>
                             <div className="space-y-3">
-                                {['name', 'price', 'category'].map(field => (
+                                {(['name', 'price', 'category'] as const).map(field => (
                                     <div key={field}>
                                         <label className="block text-textSecondary text-xs font-semibold mb-1 capitalize">{field}</label>
                                         <input
-                                            value={form[field as keyof typeof form]}
+                                            value={form[field]}
                                             onChange={e => setForm(f => ({ ...f, [field]: e.target.value }))}
                                             type={field === 'price' ? 'number' : 'text'}
                                             placeholder={field === 'price' ? '0.00' : field === 'category' ? 'e.g. snacks' : ''}
@@ -108,11 +104,8 @@ export default function ProductsPage() {
                                         />
                                     </div>
                                 ))}
-                                <button
-                                    onClick={handleAdd}
-                                    disabled={saving || !form.name || !form.price || !form.category}
-                                    className="w-full bg-blue hover:bg-blue/90 disabled:opacity-50 text-white font-semibold py-2.5 rounded-xl transition-all duration-200 active:scale-[0.98] mt-2"
-                                >
+                                <button onClick={handleAdd} disabled={saving || !form.name || !form.price || !form.category}
+                                    className="w-full bg-blue hover:bg-blue/90 disabled:opacity-50 text-white font-semibold py-2.5 rounded-xl transition-all mt-2">
                                     {saving ? 'Saving…' : 'Add Product'}
                                 </button>
                             </div>
@@ -120,38 +113,49 @@ export default function ProductsPage() {
                     </div>
                 )}
 
-                {/* Sort Controls */}
-                <div className="flex items-center gap-2 mb-4 overflow-x-auto">
-                    <span className="text-textTertiary text-xs flex-shrink-0">Sort by:</span>
-                    {(['revenue', 'qty', 'price', 'name'] as const).map(s => (
-                        <button
-                            key={s}
-                            onClick={() => setSortBy(s)}
-                            className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex-shrink-0 transition-all ${sortBy === s ? 'bg-blue text-white' : 'bg-surface2 text-textSecondary hover:text-white'}`}
-                        >
-                            {s === 'revenue' ? 'Revenue' : s === 'qty' ? 'Units Sold' : s === 'price' ? 'Price' : 'Name'}
+                {/* Search bar */}
+                <div className="relative mb-4">
+                    <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-textTertiary pointer-events-none" />
+                    <input
+                        value={search}
+                        onChange={e => setSearch(e.target.value)}
+                        placeholder="Search products or categories…"
+                        className="w-full bg-surface border border-border rounded-xl pl-9 pr-4 py-2.5 text-white text-sm focus:outline-none focus:border-blue/50 placeholder-textTertiary"
+                    />
+                    {search && (
+                        <button onClick={() => setSearch('')} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-textTertiary hover:text-white">
+                            <X size={14} />
                         </button>
-                    ))}
+                    )}
                 </div>
 
-                {sorted.length === 0 ? (
-                    <EmptyState icon="📦" message="No products yet. Add your first product!" />
+                {filtered.length === 0 ? (
+                    <EmptyState icon="📦" message={search ? `No products matching "${search}"` : 'No products yet. Add your first product!'} />
                 ) : (
                     <div className="glass-card overflow-hidden">
-                        <table className="w-full min-w-[600px]">
+                        <table className="w-full">
                             <thead className="border-b border-border">
                                 <tr>
-                                    <th className="text-left px-5 py-3 text-textTertiary text-xs font-semibold">Product</th>
-                                    <th className="text-left px-5 py-3 text-textTertiary text-xs font-semibold">Category</th>
-                                    <th className="text-right px-5 py-3 text-textTertiary text-xs font-semibold">Price</th>
-                                    <th className="text-right px-5 py-3 text-textTertiary text-xs font-semibold">Units Sold</th>
-                                    <th className="text-right px-5 py-3 text-textTertiary text-xs font-semibold">Revenue</th>
-                                    <th className="px-5 py-3"></th>
+                                    <th className="text-left px-5 py-3">
+                                        <button onClick={() => toggleSort('name')} className="flex items-center gap-1.5 text-textTertiary text-xs font-semibold hover:text-white transition-colors">
+                                            Product <SortIcon col="name" />
+                                        </button>
+                                    </th>
+                                    <th className="text-left px-5 py-3">
+                                        <button onClick={() => toggleSort('category')} className="flex items-center gap-1.5 text-textTertiary text-xs font-semibold hover:text-white transition-colors">
+                                            Category <SortIcon col="category" />
+                                        </button>
+                                    </th>
+                                    <th className="text-right px-5 py-3">
+                                        <button onClick={() => toggleSort('price')} className="flex items-center gap-1.5 ml-auto text-textTertiary text-xs font-semibold hover:text-white transition-colors">
+                                            Price <SortIcon col="price" />
+                                        </button>
+                                    </th>
+                                    <th className="px-5 py-3" />
                                 </tr>
                             </thead>
                             <tbody>
-                                {sorted.map((p) => {
-                                    const stats = productStats[p.name] || { revenue: 0, qty: 0 };
+                                {filtered.map((p) => {
                                     const isEditing = editing === p.id;
                                     return (
                                         <tr key={p.id} className="border-b border-border/50 hover:bg-surface2/40 transition-colors">
@@ -179,8 +183,6 @@ export default function ProductsPage() {
                                                     <span className="text-white font-semibold text-sm tabular-nums">{formatCurrency(p.price)}</span>
                                                 )}
                                             </td>
-                                            <td className="px-5 py-3 text-right text-textSecondary text-sm tabular-nums">{stats.qty || 0}</td>
-                                            <td className="px-5 py-3 text-right text-blue font-bold text-sm tabular-nums">{formatCurrency(stats.revenue)}</td>
                                             <td className="px-5 py-3">
                                                 <div className="flex items-center gap-1 justify-end">
                                                     {isEditing ? (

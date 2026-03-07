@@ -1,11 +1,13 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
-import { Platform, StyleSheet, View } from 'react-native';
+import { Platform, StyleSheet, View, Text } from 'react-native';
 import { useTheme } from '../../hooks/useTheme';
+import { useAnnouncements } from '../../hooks/useAnnouncements';
 
 export default function TabLayout() {
   const { colorScheme } = useTheme();
   const isDark = colorScheme === 'dark';
+  const { unreadCount } = useAnnouncements();
 
   return (
     <Tabs
@@ -91,6 +93,26 @@ export default function TabLayout() {
               focused && styles.iconContainerFocused
             ]}>
               <Ionicons name={focused ? "person" : "person-outline"} size={24} color={color} />
+              {unreadCount > 0 && (
+                <View style={{
+                  position: 'absolute',
+                  top: -2,
+                  right: 4,
+                  backgroundColor: '#FF3B30',
+                  borderRadius: 10,
+                  minWidth: 18,
+                  height: 18,
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  paddingHorizontal: 4,
+                  borderWidth: 1.5,
+                  borderColor: isDark ? '#1c1c1e' : '#ffffff',
+                }}>
+                  <Text style={{ color: '#ffffff', fontSize: 10, fontFamily: 'Outfit_700Bold' }}>
+                    {unreadCount > 99 ? '99+' : unreadCount}
+                  </Text>
+                </View>
+              )}
             </View>
           ),
         }}

@@ -8,12 +8,17 @@ import {
     Bar, BarChart, CartesianGrid, Cell,
     ResponsiveContainer, Tooltip, XAxis, YAxis
 } from 'recharts';
+import * as XLSX from 'xlsx';
+import { Download, FileText } from 'lucide-react';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 interface Employee {
     uid: string;
     name: string;
     totalRevenue: number;
+    totalTips: number;
     totalTx: number;
     firstSeen: string;
     lastSeen: string;
@@ -164,6 +169,12 @@ function EmployeeList({ employees, transactions, onSelect }: {
                                     <span className="text-textTertiary">Avg / sale</span>
                                     <span className="text-purple tabular-nums">{formatCurrency(avg)}</span>
                                 </div>
+                                {emp.totalTips > 0 && (
+                                    <div className="flex justify-between items-center text-xs">
+                                        <span className="text-textTertiary">Total tips</span>
+                                        <span className="text-orange tabular-nums">{formatCurrency(emp.totalTips)}</span>
+                                    </div>
+                                )}
                             </div>
                         </button>
                     );
@@ -544,6 +555,63 @@ function EmployeeDetail({ uid, employees, transactions, onBack }: {
                                 );
                             })}
                         </div>
+                        {dayData.dayTx.length > 0 && (
+                            <div className="flex items-center gap-2 ml-auto">
+                                <button
+                                    onClick={() => {
+                                        const rows = dayData.dayTx.map((t, i) => ({
+                                            '#': i + 1,
+                                            Items: getItems(t).map(it => `${it.productName} ×${it.quantity}`).join(', '),
+                                            Payment: t.paymentMethod?.toUpperCase() || '',
+                                            Tip: t.tip || 0,
+                                            Total: t.totalAmount || 0,
+                                        }));
+                                        const ws = XLSX.utils.json_to_sheet(rows);
+                                        const wb = XLSX.utils.book_new();
+                                        XLSX.utils.book_append_sheet(wb, ws, 'Day');
+                                        XLSX.writeFile(wb, `${emp.name}_${selectedDay}.xlsx`);
+                                    }}
+                                    className="flex items-center gap-1.5 bg-surface2 hover:bg-surface3 text-textSecondary hover:text-white text-xs font-semibold px-3 py-2 rounded-xl border border-border transition-all"
+                                >
+                                    <Download size={13} /> Excel
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        const doc = new jsPDF();
+                                        doc.setFontSize(14);
+                                        doc.setFont('helvetica', 'bold');
+                                        doc.text(`${emp.name} — Day Report`, 14, 18);
+                                        doc.setFontSize(9);
+                                        doc.setFont('helvetica', 'normal');
+                                        doc.setTextColor(120, 120, 120);
+                                        doc.text(`Date: ${selectedDay}`, 14, 26);
+                                        const dayTips = dayData.dayTx.reduce((s: number, t: any) => s + (t.tip || 0), 0);
+                                        doc.text(`Total: $${dayData.dayRevenue.toFixed(2)}  |  Tips: $${dayTips.toFixed(2)}  |  Sales: ${dayData.dayTx.length}`, 14, 32);
+                                        doc.setTextColor(0, 0, 0);
+                                        autoTable(doc, {
+                                            startY: 38,
+                                            head: [['#', 'Items', 'Payment', 'Tip', 'Total']],
+                                            body: dayData.dayTx.map((t, i) => [
+                                                i + 1,
+                                                getItems(t).map(it => `${it.productName} ×${it.quantity}`).join(', '),
+                                                t.paymentMethod?.toUpperCase() || '',
+                                                t.tip > 0 ? `$${t.tip.toFixed(2)}` : '—',
+                                                `$${(t.totalAmount || 0).toFixed(2)}`,
+                                            ]),
+                                            styles: { fontSize: 8, cellPadding: 3 },
+                                            headStyles: { fillColor: [10, 132, 255], textColor: 255, fontStyle: 'bold' },
+                                            alternateRowStyles: { fillColor: [245, 245, 245] },
+                                            foot: [['', '', '', 'Total', `$${dayData.dayRevenue.toFixed(2)}`]],
+                                            footStyles: { fontStyle: 'bold', fillColor: [230, 230, 230] },
+                                        });
+                                        doc.save(`${emp.name}_${selectedDay}.pdf`);
+                                    }}
+                                    className="flex items-center gap-1.5 bg-surface2 hover:bg-surface3 text-textSecondary hover:text-white text-xs font-semibold px-3 py-2 rounded-xl border border-border transition-all"
+                                >
+                                    <FileText size={13} /> PDF
+                                </button>
+                            </div>
+                        )}
                     </div>
 
                     {dayData.dayTx.length === 0 ? (
@@ -658,6 +726,66 @@ function EmployeeDetail({ uid, employees, transactions, onBack }: {
                                 <option key={m} value={m}>{formatMonthLabel(m)}</option>
                             ))}
                         </select>
+                        {monthData.monthTx.length > 0 && (
+                            <div className="flex items-center gap-2 ml-auto">
+                                <button
+                                    onClick={() => {
+                                        const rows = monthData.monthTx.map((t, i) => ({
+                                            '#': i + 1,
+                                            Date: t.date,
+                                            Items: getItems(t).map((it: any) => `${it.productName} ×${it.quantity}`).join(', '),
+                                            Payment: t.paymentMethod?.toUpperCase() || '',
+                                            Tip: t.tip || 0,
+                                            Total: t.totalAmount || 0,
+                                        }));
+                                        const ws = XLSX.utils.json_to_sheet(rows);
+                                        const wb = XLSX.utils.book_new();
+                                        XLSX.utils.book_append_sheet(wb, ws, 'Month');
+                                        XLSX.writeFile(wb, `${emp.name}_${selectedMonth}.xlsx`);
+                                    }}
+                                    className="flex items-center gap-1.5 bg-surface2 hover:bg-surface3 text-textSecondary hover:text-white text-xs font-semibold px-3 py-2 rounded-xl border border-border transition-all"
+                                >
+                                    <Download size={13} /> Excel
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        const monthTotal = monthData.monthTx.reduce((s: number, t: any) => s + (t.totalAmount || 0), 0);
+                                        const monthTips = monthData.monthTx.reduce((s: number, t: any) => s + (t.tip || 0), 0);
+                                        const doc = new jsPDF();
+                                        doc.setFontSize(14);
+                                        doc.setFont('helvetica', 'bold');
+                                        doc.text(`${emp.name} — Month Report`, 14, 18);
+                                        doc.setFontSize(9);
+                                        doc.setFont('helvetica', 'normal');
+                                        doc.setTextColor(120, 120, 120);
+                                        doc.text(`Month: ${selectedMonth}`, 14, 26);
+                                        doc.text(`Total: $${monthTotal.toFixed(2)}  |  Tips: $${monthTips.toFixed(2)}  |  Sales: ${monthData.monthTx.length}`, 14, 32);
+                                        doc.setTextColor(0, 0, 0);
+                                        autoTable(doc, {
+                                            startY: 38,
+                                            head: [['#', 'Date', 'Items', 'Payment', 'Tip', 'Total']],
+                                            body: monthData.monthTx.map((t: any, i: number) => [
+                                                i + 1,
+                                                t.date,
+                                                getItems(t).map((it: any) => `${it.productName} ×${it.quantity}`).join(', '),
+                                                t.paymentMethod?.toUpperCase() || '',
+                                                t.tip > 0 ? `$${t.tip.toFixed(2)}` : '—',
+                                                `$${(t.totalAmount || 0).toFixed(2)}`,
+                                            ]),
+                                            styles: { fontSize: 8, cellPadding: 3 },
+                                            headStyles: { fillColor: [10, 132, 255], textColor: 255, fontStyle: 'bold' },
+                                            alternateRowStyles: { fillColor: [245, 245, 245] },
+                                            foot: [['', '', '', '', 'Total', `$${monthTotal.toFixed(2)}`]],
+                                            footStyles: { fontStyle: 'bold', fillColor: [230, 230, 230] },
+                                        });
+                                        doc.save(`${emp.name}_${selectedMonth}.pdf`);
+                                    }}
+                                    className="flex items-center gap-1.5 bg-surface2 hover:bg-surface3 text-textSecondary hover:text-white text-xs font-semibold px-3 py-2 rounded-xl border border-border transition-all"
+                                >
+                                    <FileText size={13} /> PDF
+                                </button>
+                            </div>
+                        )}
                     </div>
 
                     {monthData.monthTx.length === 0 ? (
@@ -778,7 +906,7 @@ export default function EmployeesPage() {
             map[u.uid] = {
                 uid: u.uid,
                 name: u.name || u.email,
-                totalRevenue: 0, totalTx: 0,
+                totalRevenue: 0, totalTips: 0, totalTx: 0,
                 firstSeen: '', lastSeen: '',
             };
         }
@@ -790,12 +918,13 @@ export default function EmployeesPage() {
                 map[t.userId] = {
                     uid: t.userId,
                     name: t.userName || 'Unknown',
-                    totalRevenue: 0, totalTx: 0,
+                    totalRevenue: 0, totalTips: 0, totalTx: 0,
                     firstSeen: t.date || '',
                     lastSeen: t.date || '',
                 };
             }
             map[t.userId].totalRevenue += t.totalAmount || 0;
+            map[t.userId].totalTips += t.tip || 0;
             map[t.userId].totalTx += 1;
             if (t.date && (!map[t.userId].firstSeen || t.date < map[t.userId].firstSeen)) map[t.userId].firstSeen = t.date;
             if (t.date && t.date > map[t.userId].lastSeen) map[t.userId].lastSeen = t.date;

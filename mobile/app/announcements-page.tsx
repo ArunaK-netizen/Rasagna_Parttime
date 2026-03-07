@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import React from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
+import React, { useCallback } from 'react';
 import {
     ActivityIndicator,
     ScrollView,
@@ -30,7 +30,13 @@ export default function AnnouncementsPage() {
     const router = useRouter();
     const { colorScheme } = useTheme();
     const isDark = colorScheme === 'dark';
-    const { announcements, loading } = useAnnouncements();
+    const { announcements, loading, markAsRead } = useAnnouncements();
+
+    useFocusEffect(
+        useCallback(() => {
+            markAsRead();
+        }, [])
+    );
 
     return (
         <View style={[styles.container, isDark && styles.containerDark]}>

@@ -42,10 +42,39 @@ export function useAnalytics(transactions: Transaction[]) {
         .filter(t => t.date === today)
         .reduce((s, t) => s + (t.totalAmount || 0), 0);
 
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayStr = yesterday.toISOString().split('T')[0];
+    const yesterdayRevenue = transactions
+        .filter(t => t.date === yesterdayStr)
+        .reduce((s, t) => s + (t.totalAmount || 0), 0);
+
     const month = today.slice(0, 7);
     const monthRevenue = transactions
         .filter(t => t.date?.startsWith(month))
         .reduce((s, t) => s + (t.totalAmount || 0), 0);
+
+    // This week (Mon–today) vs last week same span
+    const todayDate = new Date();
+    const dayOfWeek = todayDate.getDay() === 0 ? 6 : todayDate.getDay() - 1; // 0=Mon
+    const weekStart = new Date(todayDate);
+    weekStart.setDate(todayDate.getDate() - dayOfWeek);
+    weekStart.setHours(0, 0, 0, 0);
+    const weekStartStr = weekStart.toISOString().split('T')[0];
+    const weekRevenue = transactions
+        .filter(t => t.date >= weekStartStr && t.date <= today)
+        .reduce((s, t) => s + (t.totalAmount || 0), 0);
+    const lastWeekStart = new Date(weekStart);
+    lastWeekStart.setDate(weekStart.getDate() - 7);
+    const lastWeekEnd = new Date(weekStart);
+    lastWeekEnd.setDate(weekStart.getDate() - 7 + dayOfWeek);
+    const lastWeekStartStr = lastWeekStart.toISOString().split('T')[0];
+    const lastWeekEndStr = lastWeekEnd.toISOString().split('T')[0];
+    const lastWeekRevenue = transactions
+        .filter(t => t.date >= lastWeekStartStr && t.date <= lastWeekEndStr)
+        .reduce((s, t) => s + (t.totalAmount || 0), 0);
+
+    const avgOrderValue = transactions.length > 0 ? (transactions.reduce((s, t) => s + (t.totalAmount || 0), 0) / transactions.length) : 0;
 
     // Employees from unique userId
     const employeeMap: Record<string, { name: string; revenue: number; txCount: number }> = {};
@@ -113,7 +142,9 @@ export function useAnalytics(transactions: Transaction[]) {
     }
 
     return {
-        totalRevenue, totalTips, todayRevenue, monthRevenue,
-        employees, monthlyBest, topProducts, last7, monthly, paymentBreakdown,
+        totalRevenue, totalTips, todayRevenue, yesterdayRevenue,
+        weekRevenue, lastWeekRevenue, avgOrderValue,
+        monthRevenue, employees, monthlyBest, topProducts,
+        last7, monthly, paymentBreakdown,
     };
 }
